@@ -118,7 +118,7 @@ const BADGES = [
   { value: '', label: '- ปกติ (ขายทั่วไป) -' },
   { value: 'Promotion', label: 'Promotion (โปรโมชั่น)' },
   { value: 'New', label: 'New (มาใหม่)' },
-  { value: 'Sold Out', label: 'Sold Out (ขายแล้ว/ย้ายไปผลงาน)' }
+  { value: 'Sold Out', label: 'Sold Out (ขายแล้ว)' }
 ];
 const DIRECTIONS = ['เหนือ', 'ใต้', 'ตะวันออก', 'ตะวันตก', 'ตะวันออกเฉียงเหนือ', 'ตะวันออกเฉียงใต้', 'ตะวันตกเฉียงเหนือ', 'ตะวันตกเฉียงใต้'];
 const COMMON_FACILITIES = ["รปภ. 24 ชม.", "สระว่ายน้ำ", "ฟิตเนส", "สวนสาธารณะ", "กล้อง CCTV", "เข้า-ออก ระบบคีย์การ์ด", "คลับเฮาส์", "สนามเด็กเล่น", "ใกล้ทางด่วน", "ใกล้รถไฟฟ้า", "ใกล้ห้างสรรพสินค้า", "ใกล้โรงเรียน", "ใกล้โรงพยาบาล", "ที่จอดรถส่วนตัว", "ถนนกว้าง", "รีโนเวทใหม่", "พร้อมอยู่"];
@@ -764,7 +764,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
   const scrollContainerRef = useRef(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  const availableProps = properties.filter(p => p.badge !== 'Sold Out');
+  const availableProps = properties;
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin text-brand-green" size={48} /></div>;
 
   const locData = visualContent?.locations || DEFAULT_LOCATIONS_DATA;
@@ -965,7 +965,18 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                                     <div className="h-[220px] w-full relative overflow-hidden bg-gray-100 pointer-events-none flex-shrink-0">
                                         <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/600x400", 600)} alt={p.project_name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
                                         <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 flex items-center gap-1.5"><Home size={14} className="text-brand-green" />{p.category}</div>
-                                        {p.badge && <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : p.badge === 'Sold Out' ? 'bg-gray-600' : 'bg-brand-green'}`}>{p.badge}</div>}
+                                        
+                                        {/* แสดงป้าย Promotion/New ตามปกติ (ซ่อนป้าย Sold Out เล็กมุมขวา) */}
+                                        {p.badge && p.badge !== 'Sold Out' && <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : 'bg-brand-green'}`}>{p.badge}</div>}
+                                        
+                                        {/* ป้าย SOLD OUT คาดกลางรูป แบบรูปไม่เบลอ */}
+                                        {p.badge === 'Sold Out' && (
+                                            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10">
+                                                <div className="bg-red-600 text-white font-black text-2xl px-6 py-2 border-4 border-white shadow-xl transform -rotate-12 tracking-widest uppercase">
+                                                    SOLD OUT
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="p-5 flex flex-col flex-grow pointer-events-none">
                                         <h4 className="font-bold text-gray-800 text-[18px] mb-2 line-clamp-2 leading-snug">{p.project_name}</h4>
@@ -1176,7 +1187,7 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
   const safeMainLoc = String(property?.main_location || '').trim();
 
   const relatedProps = properties
-      .filter(p => p && p.id && p.id !== property?.id && p.badge !== 'Sold Out')
+      .filter(p => p && p.id && p.id !== property?.id)
       .map(p => {
           let score = 0;
           const pName = String(p.project_name || '').trim();
@@ -1449,7 +1460,7 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
       return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownRef]);
 
-  let displayProps = properties.filter(p => p.badge !== 'Sold Out');
+  let displayProps = [...properties];
   let title = 'รายการทั้งหมด';
 
   if (searchParams?.type === 'promo') {
@@ -1558,10 +1569,21 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
                }
            }} className={`block bg-white border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-300 rounded-2xl overflow-hidden flex flex-col w-[300px] min-w-[300px] h-[400px] min-h-[400px] ${isEditMode ? 'pointer-events-none cursor-default' : 'cursor-pointer'} animate-pop`} style={{ animationDelay: `${index * 50}ms` }}>
                <div className="h-[220px] w-full relative overflow-hidden bg-gray-100 pointer-events-none flex-shrink-0">
-                   <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/600x400", 600)} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-                   <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 flex items-center gap-1.5"><Home size={14} className="text-brand-green" />{p.category}</div>
-                   {p.badge && <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : p.badge === 'Sold Out' ? 'bg-gray-600' : 'bg-brand-green'}`}>{p.badge}</div>}
-               </div>
+                                        <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/600x400", 600)} alt={p.project_name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                                        <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 flex items-center gap-1.5"><Home size={14} className="text-brand-green" />{p.category}</div>
+                                        
+                                        {/* แสดงป้าย Promotion/New ตามปกติ (ซ่อนป้าย Sold Out เล็กมุมขวา) */}
+                                        {p.badge && p.badge !== 'Sold Out' && <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : 'bg-brand-green'}`}>{p.badge}</div>}
+                                        
+                                        {/* ป้าย SOLD OUT คาดกลางรูป แบบรูปไม่เบลอ */}
+                                        {p.badge === 'Sold Out' && (
+                                            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10">
+                                                <div className="bg-red-600 text-white font-black text-2xl px-6 py-2 border-4 border-white shadow-xl transform -rotate-12 tracking-widest uppercase">
+                                                    SOLD OUT
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                <div className="p-5 flex flex-col flex-grow pointer-events-none">
                    <h4 className="font-bold text-gray-800 text-[18px] mb-2 line-clamp-2 leading-snug">{p.project_name}</h4>
                    <div className="text-[13px] text-gray-500 flex items-center gap-1.5 mb-4"><MapPin size={15} className="flex-shrink-0 text-gray-400" /><span className="font-light truncate">{p.main_location || p.district} {p.sub_location || p.subdistrict ? `- ${p.sub_location || p.subdistrict}` : ''}</span></div>
@@ -1711,23 +1733,6 @@ function PortfolioSection({ companyInfo, properties, visualContent, updateVisual
          <div className="text-center py-20 text-gray-400 font-light">
              <EditableText tag="p" fieldKey="portfolioEmpty" content={visualContent} updateContent={updateVisualContent} isEditMode={isEditMode} className="inline-block" />
          </div>
-      )}
-
-      {soldOutProperties.length > 0 && (
-        <div className="mb-16">
-           <h3 className="text-xl font-light text-gray-500 mb-6 uppercase tracking-widest border-b pb-2">Sold Out</h3>
-           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {soldOutProperties.map((p, idx) => (
-                <a href={`/?property=${generatePropSlug(p)}`} key={p.id} className="group relative aspect-[4/5] rounded-xl overflow-hidden bg-gray-100 animate-pop block" style={{ animationDelay: `${idx * 30}ms` }}>
-                   <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/400x500", 400)} className="w-full h-full object-cover grayscale opacity-70 group-hover:grayscale-0 transition duration-500"/>
-                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-4">
-                      <span className="text-white text-xs tracking-wider mb-1 opacity-70">SOLD</span>
-                      <p className="text-white text-sm font-light truncate">{p.project_name}</p>
-                   </div>
-                </a>
-              ))}
-           </div>
-        </div>
       )}
         
       {portfolioYears.length > 0 && (
