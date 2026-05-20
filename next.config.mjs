@@ -60,19 +60,6 @@ const contentSecurityPolicy = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: 'res.cloudinary.com' },
-      { protocol: 'https', hostname: '**.cloudinary.com' },
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'img.youtube.com' },
-      { protocol: 'https', hostname: 'i.ytimg.com' },
-      { protocol: 'https', hostname: 'placehold.co' },
-      { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
-      { protocol: 'https', hostname: '**.googleusercontent.com' },
-      { protocol: 'https', hostname: '**.gstatic.com' },
-    ],
-  },
   async headers() {
     return [
       {

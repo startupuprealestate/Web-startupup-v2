@@ -19,7 +19,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
-import Image from 'next/image';
 
 
 const Facebook = ({ size = 24, className = "" }) => (
@@ -279,70 +278,18 @@ const preloadImagesAround = (images, currentIndex, width = 1200, radius = 1) => 
   targets.forEach(index => preloadImage(images[index], width));
 };
 
-const shouldBypassNextOptimizer = (src) => (
-  typeof src === 'string' &&
-  src.startsWith('https://')
-);
-
-const NEXT_IMAGE_HOSTS = new Set([
-  'res.cloudinary.com',
-  'images.unsplash.com',
-  'img.youtube.com',
-  'i.ytimg.com',
-  'placehold.co',
-  'firebasestorage.googleapis.com'
-]);
-
-const NEXT_IMAGE_HOST_SUFFIXES = [
-  '.cloudinary.com',
-  '.googleusercontent.com',
-  '.gstatic.com'
-];
-
-const canUseNextImage = (src) => {
-  if (typeof src !== 'string') return false;
-  if (src.startsWith('/')) return true;
-  if (!src.startsWith('https://')) return false;
-
-  try {
-      const { hostname } = new URL(src);
-      return NEXT_IMAGE_HOSTS.has(hostname) || NEXT_IMAGE_HOST_SUFFIXES.some(suffix => hostname.endsWith(suffix));
-  } catch (error) {
-      return false;
-  }
-};
-
 function SmartImage({
   src,
   alt = '',
   className = '',
-  width = 800,
-  height = 600,
-  sizes = '100vw',
   priority = false,
   style,
   ...props
 }) {
   const safeSrc = src || 'https://placehold.co/600x400';
-  if (!canUseNextImage(safeSrc)) {
-      // eslint-disable-next-line @next/next/no-img-element
-      return <img src={safeSrc} alt={alt} className={className} style={style} {...props} />;
-  }
-
-  return (
-      <Image
-          src={safeSrc}
-          alt={alt}
-          width={width}
-          height={height}
-          sizes={sizes}
-          priority={priority}
-          unoptimized={shouldBypassNextOptimizer(safeSrc)}
-          className={className}
-          style={style}
-          {...props}
-      />
-  );
+  // Use a plain img so Cloudinary/CDN optimized URLs load directly without Next's image proxy delay.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={safeSrc} alt={alt} className={className} style={style} fetchPriority={priority ? 'high' : undefined} {...props} />;
 }
 
 const validateImage = (file) => {
