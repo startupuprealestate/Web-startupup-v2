@@ -13,12 +13,13 @@
  * }
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Home, MapPin, Bed, Bath, Car, Maximize, Phone, MessageCircle, Menu, X, Plus, Trash2, ShieldCheck, CheckCircle, Calculator, Users, FileText, Settings, Edit, Save, Image as ImageIcon, Layout, ChevronLeft, ChevronRight, ChevronDown, Upload, Briefcase, XCircle, Tag, Loader, Video, Check, Calendar, FolderPlus, Map as MapIcon, Search, AlertTriangle, AlertCircle, Star, ClipboardCheck, Type, LayoutTemplate, Compass } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
+import Image from 'next/image';
 
 
 const Facebook = ({ size = 24, className = "" }) => (
@@ -237,9 +238,112 @@ const uploadFileToCloudinary = async (file) => {
 };
 
 const getOptimizedImg = (url, width = 800) => {
-  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
-  return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  if (!url || typeof url !== 'string') return url;
+  if (url.includes('cloudinary.com')) {
+      return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  }
+  if (url.includes('images.unsplash.com')) {
+      try {
+          const optimizedUrl = new URL(url);
+          optimizedUrl.searchParams.set('auto', 'format');
+          optimizedUrl.searchParams.set('fit', optimizedUrl.searchParams.get('fit') || 'crop');
+          optimizedUrl.searchParams.set('w', String(width));
+          optimizedUrl.searchParams.set('q', width > 1000 ? '75' : '70');
+          return optimizedUrl.toString();
+      } catch (error) {
+          return url;
+      }
+  }
+  return url;
 };
+
+const preloadedImageUrls = new Set();
+
+const preloadImage = (url, width = 1200) => {
+  if (typeof window === 'undefined' || !url) return;
+  const src = getOptimizedImg(url, width);
+  if (!src || preloadedImageUrls.has(src)) return;
+  preloadedImageUrls.add(src);
+  const img = new window.Image();
+  img.decoding = 'async';
+  img.src = src;
+};
+
+const preloadImagesAround = (images, currentIndex, width = 1200, radius = 1) => {
+  if (typeof window === 'undefined' || !Array.isArray(images) || images.length === 0) return;
+  const targets = new Set([currentIndex]);
+  for (let offset = 1; offset <= radius; offset += 1) {
+      targets.add((currentIndex + offset) % images.length);
+      targets.add((currentIndex - offset + images.length) % images.length);
+  }
+  targets.forEach(index => preloadImage(images[index], width));
+};
+
+const shouldBypassNextOptimizer = (src) => (
+  typeof src === 'string' &&
+  src.startsWith('https://')
+);
+
+const NEXT_IMAGE_HOSTS = new Set([
+  'res.cloudinary.com',
+  'images.unsplash.com',
+  'img.youtube.com',
+  'i.ytimg.com',
+  'placehold.co',
+  'firebasestorage.googleapis.com'
+]);
+
+const NEXT_IMAGE_HOST_SUFFIXES = [
+  '.cloudinary.com',
+  '.googleusercontent.com',
+  '.gstatic.com'
+];
+
+const canUseNextImage = (src) => {
+  if (typeof src !== 'string') return false;
+  if (src.startsWith('/')) return true;
+  if (!src.startsWith('https://')) return false;
+
+  try {
+      const { hostname } = new URL(src);
+      return NEXT_IMAGE_HOSTS.has(hostname) || NEXT_IMAGE_HOST_SUFFIXES.some(suffix => hostname.endsWith(suffix));
+  } catch (error) {
+      return false;
+  }
+};
+
+function SmartImage({
+  src,
+  alt = '',
+  className = '',
+  width = 800,
+  height = 600,
+  sizes = '100vw',
+  priority = false,
+  style,
+  ...props
+}) {
+  const safeSrc = src || 'https://placehold.co/600x400';
+  if (!canUseNextImage(safeSrc)) {
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={safeSrc} alt={alt} className={className} style={style} {...props} />;
+  }
+
+  return (
+      <Image
+          src={safeSrc}
+          alt={alt}
+          width={width}
+          height={height}
+          sizes={sizes}
+          priority={priority}
+          unoptimized={shouldBypassNextOptimizer(safeSrc)}
+          className={className}
+          style={style}
+          {...props}
+      />
+  );
+}
 
 const validateImage = (file) => {
   if (!file || !file.type) return false;
@@ -288,6 +392,11 @@ function Lightbox({ isOpen, images, startIndex, onClose }) {
   }, [isOpen, startIndex]);
 
   useEffect(() => {
+      if (!isOpen) return;
+      preloadImagesAround(images, currentIndex, 1600, 1);
+  }, [isOpen, images, currentIndex]);
+
+  useEffect(() => {
       if (isOpen) document.body.style.overflow = 'hidden';
       else document.body.style.overflow = 'unset';
       return () => { document.body.style.overflow = 'unset'; };
@@ -319,10 +428,15 @@ function Lightbox({ isOpen, images, startIndex, onClose }) {
           <button onClick={onClose} className="absolute top-4 right-4 md:top-6 md:right-6 text-white/70 hover:text-white z-50 p-2 bg-black/20 rounded-full transition"><X size={32}/></button>
           
           <div className="relative w-full max-w-6xl h-full flex items-center justify-center p-4 md:p-8">
-              <img 
-                  src={getOptimizedImg(images[currentIndex], 1920)} 
+              <SmartImage 
+                  src={getOptimizedImg(images[currentIndex], 1600)} 
                   alt={`Image ${currentIndex + 1}`} 
+                  width={1600}
+                  height={1200}
+                  sizes="100vw"
+                  priority
                   className="max-w-full max-h-full object-contain rounded-md shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200"
+                  decoding="async"
                   onClick={(e) => e.stopPropagation()} 
               />
               
@@ -398,16 +512,27 @@ function HeroSection({ visualContent, updateVisualContent, isEditMode }) {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   
-  const heroBgs = Array.isArray(visualContent?.heroBgs) ? visualContent.heroBgs : (visualContent?.heroBg ? [visualContent.heroBg] : DEFAULT_VISUAL_CONTENT.heroBgs);
+  const heroBgs = useMemo(() => {
+      if (Array.isArray(visualContent?.heroBgs) && visualContent.heroBgs.length > 0) return visualContent.heroBgs;
+      if (visualContent?.heroBg) return [visualContent.heroBg];
+      return DEFAULT_VISUAL_CONTENT.heroBgs;
+  }, [visualContent]);
+  const heroImg = heroBgs[currentIndex] || heroBgs[0];
 
   const nextSlide = () => setCurrentIndex(prev => (prev + 1) % heroBgs.length);
   const prevSlide = () => setCurrentIndex(prev => (prev === 0 ? heroBgs.length - 1 : prev - 1));
 
   useEffect(() => {
       if (heroBgs.length <= 1) return;
-      const interval = setInterval(nextSlide, 5000);
+      const interval = setInterval(() => {
+          setCurrentIndex(prev => (prev + 1) % heroBgs.length);
+      }, 5000);
       return () => clearInterval(interval);
-  }, [currentIndex, heroBgs.length]);
+  }, [heroBgs.length]);
+
+  useEffect(() => {
+      preloadImagesAround(heroBgs, currentIndex, 1600, 1);
+  }, [heroBgs, currentIndex]);
 
   const handleTouchStart = (e) => setTouchStart(e.targetTouches[0].clientX);
   const handleTouchMove = (e) => setTouchEnd(e.targetTouches[0].clientX);
@@ -455,14 +580,17 @@ function HeroSection({ visualContent, updateVisualContent, isEditMode }) {
               onTouchEnd={handleTouchEndAction}
           >
               <div className="relative w-full">
-                  {heroBgs.map((img, idx) => (
-                      <img 
-                          key={idx}
-                          src={getOptimizedImg(img, 1920)} 
-                          alt={`Hero ${idx}`} 
-                          className={`w-full h-auto block transition-opacity duration-1000 ease-in-out ${idx === currentIndex ? 'relative opacity-100 z-10' : 'absolute top-0 left-0 opacity-0 z-0'}`} 
-                      />
-                  ))}
+                  <SmartImage 
+                      key={heroImg}
+                      src={getOptimizedImg(heroImg, 1600)} 
+                      alt={`Hero ${currentIndex + 1}`} 
+                      width={1600}
+                      height={900}
+                      sizes="100vw"
+                      priority
+                      className="relative z-10 w-full h-auto block transition-opacity duration-700 ease-in-out" 
+                      decoding="async"
+                  />
               </div>
               
               {heroBgs.length > 1 && !isEditMode && (
@@ -751,7 +879,7 @@ function PropertyMap({ properties, onSelectProp }) {
       
       initMap();
       return () => { cancelled = true; };
-  }, [properties]);
+  }, [properties, onSelectProp]);
 
   return (
       <div className="w-full relative border border-gray-200 rounded-[20px] overflow-hidden shadow-sm bg-gray-50 z-0">
@@ -881,7 +1009,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                             }}
                             className={`block w-full h-full ${isEditMode ? 'cursor-default' : 'cursor-pointer'}`}
                         >
-                            <img src={getOptimizedImg(loc.img, 600)} alt={loc.area} className="w-full h-full object-cover group-hover:scale-110 transition duration-700 pointer-events-none" />
+                            <SmartImage src={getOptimizedImg(loc.img, 500)} alt={loc.area} width={500} height={320} sizes="(max-width: 768px) 240px, 360px" className="w-full h-full object-cover group-hover:scale-110 transition duration-700 pointer-events-none" loading="lazy" decoding="async" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 pointer-events-none"></div>
                             <div className="absolute bottom-4 left-4 right-4 md:bottom-6 md:left-6 md:right-6 flex justify-between items-end pointer-events-none">
                                 <div className="text-white">
@@ -967,7 +1095,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                                     }
                                 }} className={`block bg-white border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-300 rounded-2xl overflow-hidden flex flex-col w-[300px] min-w-[300px] h-[400px] min-h-[400px] snap-center flex-shrink-0 ${isEditMode ? 'pointer-events-none cursor-default' : 'cursor-pointer'}`}>
                                     <div className="h-[220px] w-full relative overflow-hidden bg-gray-100 pointer-events-none flex-shrink-0">
-                                        <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/600x400", 600)} alt={p.project_name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                                        <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/600x400", 500)} alt={p.project_name} width={500} height={360} sizes="300px" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
                                         <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 flex items-center gap-1.5"><Home size={14} className="text-brand-green" />{p.category}</div>
                                         
                                         {/* แสดงป้าย Promotion/New ตามปกติ (ซ่อนป้าย Sold Out เล็กมุมขวา) */}
@@ -1059,7 +1187,7 @@ function LocationSection({ onSelectLocation, visualContent, updateVisualContent,
                        if (onSelectLocation && !isEditMode) onSelectLocation('main_location', loc.area);
                    }
                }} className={`block w-full h-full ${isEditMode ? 'pointer-events-none cursor-default' : 'cursor-pointer'}`}>
-                   <img src={getOptimizedImg(loc.img, 600)} className="w-full h-full object-cover group-hover:scale-105 transition duration-700" alt={loc.area} />
+                   <SmartImage src={getOptimizedImg(loc.img, 500)} className="w-full h-full object-cover group-hover:scale-105 transition duration-700" alt={loc.area} width={500} height={360} sizes="(max-width: 768px) 50vw, 25vw" loading="lazy" decoding="async" />
                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4 md:p-6 transition group-hover:bg-black/30">
                       <h3 className="text-lg md:text-2xl font-medium tracking-wide text-white">{loc.area}</h3>
                    </div>
@@ -1176,13 +1304,21 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
   const desktopScrollRef = useRef(null);
   const mobileScrollRef = useRef(null);
   
-  const images = Array.isArray(property?.images) && property.images.length > 0 ? property.images : [property?.imageUrl || "https://placehold.co/600x400"];
+  const images = useMemo(() => (
+      Array.isArray(property?.images) && property.images.length > 0
+          ? property.images
+          : [property?.imageUrl || "https://placehold.co/600x400"]
+  ), [property]);
   const youtubeId = getYoutubeId(property?.youtubeUrl || '');
 
   useEffect(() => {
       setActiveImg(0);
       setIsVideoPlaying(false);
   }, [property?.id]);
+
+  useEffect(() => {
+      preloadImagesAround(images, activeImg, 1100, 1);
+  }, [images, activeImg]);
 
   const safePropName = String(property?.project_name || '').trim();
   const safeSubDist = String(property?.subdistrict || '').trim();
@@ -1215,6 +1351,11 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
       }
   };
 
+  const selectActiveImage = (index) => {
+      preloadImagesAround(images, index, 1100, 1);
+      setActiveImg(index);
+  };
+
   const renderRelatedProps = (refToUse) => {
       if (relatedProps.length === 0) return null;
       return (
@@ -1231,7 +1372,7 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                       <a href={`/api/share?property=${generatePropSlug(p)}`} key={p.id} onClick={(e) => { if (!e.ctrlKey && !e.metaKey && !e.button) { e.preventDefault(); if(!isEditMode) onSelectProp(p); } }} 
                          className={`block bg-white border border-gray-200 hover:border-brand-green hover:shadow-md transition-all duration-200 rounded-lg overflow-hidden flex flex-col w-[220px] md:w-[250px] snap-center flex-shrink-0 ${isEditMode ? 'pointer-events-none cursor-default' : 'cursor-pointer'}`}>
                           <div className="h-[150px] md:h-[160px] w-full relative overflow-hidden bg-gray-100 pointer-events-none flex-shrink-0">
-                              <img src={getOptimizedImg(p.images?.[0] || p.imageUrl, 400)} alt={p.project_name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                              <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl, 400)} alt={p.project_name} width={400} height={260} sizes="(max-width: 768px) 220px, 250px" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
                               <div className="absolute top-2 left-2 bg-white/95 px-2 py-1 rounded text-[10px] font-medium shadow-sm z-10">{p.category}</div>
                               {p.badge && <div className={`absolute top-2 right-2 px-2 py-1 rounded font-medium text-[10px] shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : p.badge === 'Sold Out' ? 'bg-gray-600' : 'bg-brand-green'}`}>{p.badge}</div>}
                           </div>
@@ -1256,7 +1397,7 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
       
       {/* Background Effect */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
-          <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.05] transition-all duration-1000 ease-in-out" style={{ backgroundImage: `url(${images[activeImg] || images[0]})` }} />
+          <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.05] transition-all duration-1000 ease-in-out" style={{ backgroundImage: `url(${getOptimizedImg(images[activeImg] || images[0], 800)})` }} />
           <div className="absolute inset-0 bg-gradient-to-b from-gray-50/80 via-gray-50/95 to-gray-50" />
       </div>
 
@@ -1310,16 +1451,21 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                 onClick={() => openLightbox && openLightbox(images, activeImg)}
                 title="คลิกเพื่อขยายรูปภาพ"
             >
-                <img 
-                    src={getOptimizedImg(images[activeImg] || images[0] || "https://placehold.co/600x400", 1200)} 
+                <SmartImage 
+                    src={getOptimizedImg(images[activeImg] || images[0] || "https://placehold.co/600x400", 1100)} 
                     className="w-full h-auto object-contain transition duration-500 animate-pop" 
                     alt="Main" 
+                    width={1100}
+                    height={800}
+                    sizes="(max-width: 1024px) 100vw, 660px"
+                    priority
+                    decoding="async"
                 />
                 
                 {images.length > 1 && (
                     <>
-                        <button onClick={(e) => { e.stopPropagation(); setActiveImg(prev => (prev === 0 ? images.length - 1 : prev - 1)); }} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 text-brand-green p-2 rounded-full hover:bg-white transition shadow-md opacity-0 group-hover:opacity-100 z-20"><ChevronLeft /></button>
-                        <button onClick={(e) => { e.stopPropagation(); setActiveImg(prev => (prev === images.length - 1 ? 0 : prev + 1)); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 text-brand-green p-2 rounded-full hover:bg-white transition shadow-md opacity-0 group-hover:opacity-100 z-20"><ChevronRight /></button>
+                        <button onClick={(e) => { e.stopPropagation(); selectActiveImage(activeImg === 0 ? images.length - 1 : activeImg - 1); }} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 text-brand-green p-2 rounded-full hover:bg-white transition shadow-md opacity-0 group-hover:opacity-100 z-20"><ChevronLeft /></button>
+                        <button onClick={(e) => { e.stopPropagation(); selectActiveImage(activeImg === images.length - 1 ? 0 : activeImg + 1); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 text-brand-green p-2 rounded-full hover:bg-white transition shadow-md opacity-0 group-hover:opacity-100 z-20"><ChevronRight /></button>
                     </>
                 )}
                 {property.badge && <div className={`absolute top-4 right-4 px-4 py-1.5 rounded-full font-medium text-xs shadow-lg z-20 text-white ${property.badge === 'Promotion' ? 'bg-red-600' : property.badge === 'New' ? 'bg-blue-600' : property.badge === 'Sold Out' ? 'bg-gray-600' : 'bg-brand-green'}`}>{property.badge}</div>}
@@ -1331,8 +1477,8 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
             
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-4">
                 {images.map((img, idx) => (
-                    <button key={idx} onClick={() => setActiveImg(idx)} className={`w-16 h-16 md:w-20 md:h-20 flex-shrink-0 overflow-hidden border-2 transition-all bg-gray-100 rounded-lg ${activeImg === idx ? 'border-brand-green opacity-100' : 'border-transparent opacity-60 hover:opacity-100'}`}>
-                        <img src={getOptimizedImg(img || "https://placehold.co/100x100", 300)} className="w-full h-full object-cover" alt={`Thumb ${idx}`} />
+                    <button key={idx} onClick={() => selectActiveImage(idx)} onMouseEnter={() => preloadImage(img, 1100)} onFocus={() => preloadImage(img, 1100)} className={`w-16 h-16 md:w-20 md:h-20 flex-shrink-0 overflow-hidden border-2 transition-all bg-gray-100 rounded-lg ${activeImg === idx ? 'border-brand-green opacity-100' : 'border-transparent opacity-60 hover:opacity-100'}`}>
+                        <SmartImage src={getOptimizedImg(img || "https://placehold.co/100x100", 240)} className="w-full h-full object-cover" alt={`Thumb ${idx}`} width={120} height={120} sizes="80px" loading="lazy" decoding="async" />
                     </button>
                 ))}
             </div>
@@ -1373,11 +1519,11 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                         <div className="aspect-video rounded-xl overflow-hidden bg-black shadow-sm relative">
                             {!isVideoPlaying ? (
                                 <div className="w-full h-full cursor-pointer group relative" onClick={() => setIsVideoPlaying(true)}>
-                                    <img src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Video Preview" onError={(e) => { e.target.src = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`; }} />
+                                    <SmartImage src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Video Preview" width={1280} height={720} sizes="(max-width: 1024px) 100vw, 660px" loading="lazy" decoding="async" onError={(e) => { e.target.src = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`; }} />
                                     <div className="absolute inset-0 flex items-center justify-center"><div className="w-14 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform"><svg className="w-6 h-6 text-white fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
                                 </div>
                             ) : (
-                                <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                <iframe width="100%" height="100%" src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin"></iframe>
                             )}
                         </div>
                     </div>
@@ -1390,13 +1536,15 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                         {/* ลบ pointer-events-none ออก เพื่อให้ลูกค้าใช้นิ้วเลื่อนซูมแผนที่ได้ */}
                         <div className="aspect-video md:aspect-[21/9] rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm relative">
                             <iframe 
+                                title="Google Maps"
                                 width="100%" 
                                 height="100%" 
                                 frameBorder="0" 
                                 style={{ border: 0 }} 
-                                src={`https://maps.google.com/maps?q=${property.lat},${property.lng}&hl=th&z=16&output=embed`} 
+                                src={`https://maps.google.com/maps?q=${encodeURIComponent(`${property.lat},${property.lng}`)}&hl=th&z=16&output=embed`} 
                                 allowFullScreen
                                 loading="lazy"
+                                referrerPolicy="no-referrer-when-downgrade"
                             ></iframe>
                         </div>
                         
@@ -1421,11 +1569,11 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
 
          <div className="lg:w-[40%] space-y-6 order-2 w-full reveal-on-scroll delay-200">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24 text-center">
-                {companyInfo?.logoUrl && (<img src={companyInfo.logoUrl} alt="Logo" className="h-12 mx-auto mb-4 object-contain" />)}
+                {companyInfo?.logoUrl && (<SmartImage src={getOptimizedImg(companyInfo.logoUrl, 240)} alt="Logo" width={240} height={96} sizes="240px" className="h-12 w-auto mx-auto mb-4 object-contain" loading="lazy" decoding="async" />)}
                 <h3 className="font-medium text-base mb-5">สนใจติดต่อ</h3>
                 <div className="space-y-3 mb-6">
                     <a href={isEditMode ? '#' : `tel:${companyInfo?.phone}`} className={`flex items-center justify-center gap-2 w-full bg-brand-green text-white py-3 rounded-full text-sm font-light hover:bg-opacity-90 transition hover:-translate-y-1 ${isEditMode ? 'pointer-events-none' : ''}`}><Phone size={16} /> {companyInfo?.phone}</a>
-                    <a href={isEditMode ? '#' : companyInfo?.line} target="_blank" rel="noreferrer" className={`flex items-center justify-center gap-2 w-full bg-[#06C755] text-white py-3 rounded-full text-sm font-light hover:bg-opacity-90 transition hover:-translate-y-1 ${isEditMode ? 'pointer-events-none' : ''}`}><MessageCircle size={16} /> ทักไลน์</a>
+                    <a href={isEditMode ? '#' : companyInfo?.line} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-center gap-2 w-full bg-[#06C755] text-white py-3 rounded-full text-sm font-light hover:bg-opacity-90 transition hover:-translate-y-1 ${isEditMode ? 'pointer-events-none' : ''}`}><MessageCircle size={16} /> ทักไลน์</a>
                 </div>
                 <div className="border-t border-gray-100 pt-5 text-left">
                     <CalculatorSection defaultPrice={property.price} minimalist={true} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isEditMode} />
@@ -1573,7 +1721,7 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
                }
            }} className={`block bg-white border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all duration-300 rounded-2xl overflow-hidden flex flex-col w-[300px] min-w-[300px] h-[400px] min-h-[400px] ${isEditMode ? 'pointer-events-none cursor-default' : 'cursor-pointer'} animate-pop`} style={{ animationDelay: `${index * 50}ms` }}>
                <div className="h-[220px] w-full relative overflow-hidden bg-gray-100 pointer-events-none flex-shrink-0">
-                                        <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/600x400", 600)} alt={p.project_name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                                        <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/600x400", 500)} alt={p.project_name} width={500} height={360} sizes="300px" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
                                         <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm text-gray-700 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 flex items-center gap-1.5"><Home size={14} className="text-brand-green" />{p.category}</div>
                                         
                                         {/* แสดงป้าย Promotion/New ตามปกติ (ซ่อนป้าย Sold Out เล็กมุมขวา) */}
@@ -1696,10 +1844,12 @@ function PortfolioSection({ companyInfo, properties, visualContent, updateVisual
                         <div 
                             key={i} 
                             onClick={() => openLightbox(totalImages, startIndex + i)} 
+                            onMouseEnter={() => preloadImage(img, 1600)}
+                            onFocus={() => preloadImage(img, 1600)}
                             className="break-inside-avoid rounded-xl overflow-hidden bg-gray-100 animate-pop shadow-sm hover:shadow-md cursor-pointer group mb-4 relative" 
                             style={{ animationDelay: `${(i % IMAGES_PER_PAGE) * 30}ms` }}
                         >
-                            <img src={getOptimizedImg(img, 800)} className="w-full h-auto group-hover:scale-105 transition duration-500" alt={`Portfolio image ${startIndex + i + 1}`}/>
+                            <SmartImage src={getOptimizedImg(img, 800)} className="w-full h-auto group-hover:scale-105 transition duration-500" alt={`Portfolio image ${startIndex + i + 1}`} width={800} height={1000} sizes="(max-width: 768px) 50vw, 25vw" loading="lazy" decoding="async"/>
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                                 <Maximize size={32} className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
                             </div>
@@ -1750,7 +1900,7 @@ function PortfolioSection({ companyInfo, properties, visualContent, updateVisual
                   return (
                       <div key={idx} onClick={() => handleOpenAlbum(yearGroup.year)} className="group cursor-pointer animate-pop" style={{ animationDelay: `${idx * 30}ms` }}>
                           <div className="aspect-square rounded-2xl overflow-hidden bg-gray-100 relative shadow-sm group-hover:shadow-md transition-all duration-300">
-                              <img src={getOptimizedImg(coverImg, 600)} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt={`Portfolio ${yearGroup.year}`} />
+                              <SmartImage src={getOptimizedImg(coverImg, 500)} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt={`Portfolio ${yearGroup.year}`} width={500} height={500} sizes="(max-width: 768px) 50vw, 25vw" loading="lazy" decoding="async" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
                               <div className="absolute bottom-4 left-4 right-4 text-white">
                                   <div className="flex items-center gap-2 mb-1">
@@ -2298,7 +2448,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                 {filteredProperties.map(p => (
                                     <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 items-center">
                                         <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden relative bg-gray-100 flex-shrink-0">
-                                            <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/300x300", 300)} className="w-full h-full object-cover" alt={p.project_name || 'Property image'}/>
+                                            <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/300x300", 300)} className="w-full h-full object-cover" alt={p.project_name || 'Property image'} width={300} height={300} sizes="96px" loading="lazy" decoding="async" />
                                         </div>
                                         <div className="flex-1 w-full text-center sm:text-left">
                                             <h4 className="font-medium line-clamp-1">{p.project_name}</h4>
@@ -2418,7 +2568,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                         <div className="grid grid-cols-3 gap-2 mb-4">
                                             {imagesPreview.map((img, i) => (
                                                 <div key={i} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden border">
-                                                    <img src={img} className="w-full h-full object-cover" alt={`Property image ${i + 1}`}/>
+                                                    <SmartImage src={img} className="w-full h-full object-cover" alt={`Property image ${i + 1}`} width={240} height={240} sizes="120px" loading="lazy" decoding="async" />
                                                     
                                                     <button type="button" onClick={()=>removeImage(i)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition z-10 shadow-sm" title="ลบรูปภาพ">
                                                         <X size={12}/>
@@ -2479,7 +2629,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                             <div className="absolute inset-0 flex items-center justify-center bg-gray-200"><Loader className="animate-spin text-brand-green" size={24} /></div>
                                         ) : (
                                             <>
-                                                <img src={getOptimizedImg(companyForm.logoUrl, 300)} className="w-full h-full object-cover" alt="Company logo"/>
+                                                <SmartImage src={getOptimizedImg(companyForm.logoUrl, 300)} className="w-full h-full object-cover" alt="Company logo" width={300} height={300} sizes="96px" loading="lazy" decoding="async" />
                                                 <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer text-xs w-full h-full transition">
                                                     <Upload size={16}/>เปลี่ยน
                                                     <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
@@ -2532,7 +2682,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                                 {yg.images.map((img, i) => (
                                                     <div key={i} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden border">
-                                                        <img src={getOptimizedImg(img, 300)} className="w-full h-full object-contain" alt={`Portfolio ${yg.year} image ${i + 1}`}/>
+                                                        <SmartImage src={getOptimizedImg(img, 300)} className="w-full h-full object-contain" alt={`Portfolio ${yg.year} image ${i + 1}`} width={300} height={300} sizes="160px" loading="lazy" decoding="async" />
                                                         
                                                         <button onClick={()=>removePortfolioImageInYear(yg.year, i)} className="absolute top-1 right-1 bg-red-500 text-white p-1.5 rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition z-10 shadow-sm" title="ลบรูปภาพ"><X size={14}/></button>
                                                         
@@ -2575,7 +2725,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                             <Loader className="animate-spin text-brand-green" size={32} />
                                         ) : popupForm.imageUrl ? (
                                             <>
-                                                <img src={getOptimizedImg(popupForm.imageUrl, 600)} className="w-full h-full object-contain" alt="Promotion popup" />
+                                                <SmartImage src={getOptimizedImg(popupForm.imageUrl, 600)} className="w-full h-full object-contain" alt="Promotion popup" width={600} height={600} sizes="384px" loading="lazy" decoding="async" />
                                                 <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition">
                                                     <Upload size={24} className="mb-2"/> เปลี่ยนรูปภาพ
                                                     <input type="file" accept="image/*" className="hidden" onChange={handlePopupImageUpload} />
@@ -2706,12 +2856,15 @@ export default function App() {
           });
       }, { threshold: 0.1, rootMargin: "0px 0px -50px 0px" });
       
-      setTimeout(() => {
+      const timer = setTimeout(() => {
           document.querySelectorAll('.reveal-on-scroll').forEach(el => observer.observe(el));
       }, 100);
 
-      return () => observer.disconnect();
-  });
+      return () => {
+          clearTimeout(timer);
+          observer.disconnect();
+      };
+  }, [activeTab, selectedProperty, loading, properties.length]);
 
   useEffect(() => {
       const syncFromUrl = () => {
@@ -2837,25 +2990,25 @@ export default function App() {
       }
   }, [popupData]);
 
-  const updateVisualContent = (newContent) => {
+  const updateVisualContent = useCallback((newContent) => {
       setPastVisual([...pastVisual, visualContent]);
       setVisualContent(newContent);
       setFutureVisual([]);
-  };
-  const undoVisual = () => {
+  }, [pastVisual, visualContent]);
+  const undoVisual = useCallback(() => {
       if (pastVisual.length === 0) return;
       const prev = pastVisual[pastVisual.length - 1];
       setFutureVisual([visualContent, ...futureVisual]);
       setVisualContent(prev);
       setPastVisual(pastVisual.slice(0, -1));
-  };
-  const redoVisual = () => {
+  }, [pastVisual, visualContent, futureVisual]);
+  const redoVisual = useCallback(() => {
       if (futureVisual.length === 0) return;
       const next = futureVisual[0];
       setPastVisual([...pastVisual, visualContent]);
       setVisualContent(next);
       setFutureVisual(futureVisual.slice(1));
-  };
+  }, [futureVisual, pastVisual, visualContent]);
   const saveVisualEdit = () => {
       if (userRole !== 'host') {
           showGlobalAlert('ปฏิเสธการเข้าถึง', 'เฉพาะ Host เท่านั้นที่สามารถบันทึกการแก้ไขหน้าเว็บได้', 'error');
@@ -2910,7 +3063,7 @@ export default function App() {
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isVisualEditMode, pastVisual, futureVisual, visualContent]);
+  }, [isVisualEditMode, undoVisual, redoVisual]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -2975,7 +3128,12 @@ export default function App() {
     if (!user) return;
     
     const qProps = query(collection(db, 'artifacts', appId, 'public', 'data', 'properties'));
-    const unsubProps = onSnapshot(qProps, (snapshot) => {
+    const companyRef = doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main');
+    const visualRef = doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'visual');
+    const popupRef = doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'popup');
+    const canManageSite = userRole === 'host' || userRole === 'admin';
+
+    const applyPropertiesSnapshot = (snapshot) => {
       const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       props.sort((a, b) => {
          if (a.badge === 'Sold Out' && b.badge !== 'Sold Out') return 1;
@@ -2984,42 +3142,72 @@ export default function App() {
       });
       setProperties(props);
       setLoading(false);
-    }, (error) => {
-      console.warn(error);
-      setLoading(false);
-    });
+    };
 
-    const unsubCompany = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), (docSnap) => {
+    const applyCompanySnapshot = (docSnap) => {
       if (docSnap.exists()) {
           setCompanyInfo({ ...DEFAULT_COMPANY_INFO, ...docSnap.data() });
       }
-    }, (error) => console.warn(error));
+    };
 
-    const unsubVisual = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'visual'), (docSnap) => {
+    const applyVisualSnapshot = (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             if(!data.locations) data.locations = DEFAULT_LOCATIONS_DATA;
             setVisualContent({ ...DEFAULT_VISUAL_CONTENT, ...data });
         }
-    }, (error) => console.warn(error));
+    };
 
-    const unsubPopup = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'popup'), (docSnap) => {
+    const applyPopupSnapshot = (docSnap) => {
         if (docSnap.exists()) {
             setPopupData(docSnap.data());
         }
-    }, (error) => console.warn(error));
+    };
+
+    if (!canManageSite) {
+      let isCancelled = false;
+      const loadPublicData = async () => {
+        try {
+          const [propsSnap, companySnap, visualSnap, popupSnap] = await Promise.all([
+            getDocs(qProps),
+            getDoc(companyRef),
+            getDoc(visualRef),
+            getDoc(popupRef)
+          ]);
+          if (isCancelled) return;
+          applyPropertiesSnapshot(propsSnap);
+          applyCompanySnapshot(companySnap);
+          applyVisualSnapshot(visualSnap);
+          applyPopupSnapshot(popupSnap);
+        } catch (error) {
+          if (!isCancelled) {
+            console.warn(error);
+            setLoading(false);
+          }
+        }
+      };
+      loadPublicData();
+      return () => { isCancelled = true; };
+    }
+
+    const unsubProps = onSnapshot(qProps, applyPropertiesSnapshot, (error) => {
+      console.warn(error);
+      setLoading(false);
+    });
+
+    const unsubCompany = onSnapshot(companyRef, applyCompanySnapshot, (error) => console.warn(error));
+    const unsubVisual = onSnapshot(visualRef, applyVisualSnapshot, (error) => console.warn(error));
+    const unsubPopup = onSnapshot(popupRef, applyPopupSnapshot, (error) => console.warn(error));
 
     let unsubUsers = () => {};
-    if (userRole === 'host' || userRole === 'admin') {
-       const qUsers = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
-       unsubUsers = onSnapshot(qUsers, (snapshot) => {
-         const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-         setAuthorizedUsers(users);
-         if (!users.some(u => u.email === HOST_EMAIL) && users.length === 0) {
-            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', 'host_init'), { email: HOST_EMAIL, role: 'host', name: 'Main Host', createdAt: serverTimestamp() }).catch(e=>console.warn(e));
-         }
-       }, (error) => console.warn(error));
-    }
+    const qUsers = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
+    unsubUsers = onSnapshot(qUsers, (snapshot) => {
+      const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAuthorizedUsers(users);
+      if (!users.some(u => u.email === HOST_EMAIL) && users.length === 0) {
+         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', 'host_init'), { email: HOST_EMAIL, role: 'host', name: 'Main Host', createdAt: serverTimestamp() }).catch(e=>console.warn(e));
+      }
+    }, (error) => console.warn(error));
     
     return () => { unsubProps(); unsubCompany(); unsubVisual(); unsubPopup(); unsubUsers(); };
   }, [user, userRole]);
@@ -3237,7 +3425,7 @@ export default function App() {
             <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
                 <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full relative overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
                     <div className="w-full relative flex-1 flex bg-gray-100">
-                          <img src={popupData.imageUrl} className="w-full h-auto max-h-[80vh] object-contain block m-0 p-0" alt="Promotion Popup" />
+                          <SmartImage src={getOptimizedImg(popupData.imageUrl, 900)} className="w-full h-auto max-h-[80vh] object-contain block m-0 p-0" alt="Promotion Popup" width={900} height={900} sizes="(max-width: 640px) 100vw, 512px" priority decoding="async" />
                     </div>
                     <div className="p-4 bg-white border-t flex items-center justify-between flex-shrink-0">
                         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
@@ -3267,7 +3455,7 @@ export default function App() {
                       } 
                   }} className={`cursor-pointer inline-block ${isVisualEditMode ? 'pointer-events-none opacity-50' : ''}`}>
                       {companyInfo?.logoUrl ? (
-                          <img src={getOptimizedImg(companyInfo.logoUrl, 200)} alt="Logo" className="h-10 md:h-12 object-contain" loading="eager" fetchPriority="high" onError={(e) => { e.target.onerror = null; e.target.src = 'https://res.cloudinary.com/dm2wr55r5/image/upload/v1773023427/LOGO_%E0%B9%80%E0%B8%82%E0%B8%B5%E0%B8%A2%E0%B8%A7%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87_vhyhyo.png'; }} />
+                          <SmartImage src={getOptimizedImg(companyInfo.logoUrl, 200)} alt="Logo" width={200} height={80} sizes="200px" priority className="h-10 md:h-12 w-auto object-contain" decoding="async" onError={(e) => { e.target.onerror = null; e.target.src = 'https://res.cloudinary.com/dm2wr55r5/image/upload/v1773023427/LOGO_%E0%B9%80%E0%B8%82%E0%B8%B5%E0%B8%A2%E0%B8%A7%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87_vhyhyo.png'; }} />
                       ) : (
                           <span className="text-xl md:text-2xl font-light tracking-[0.2em] text-brand-green uppercase whitespace-nowrap">Startup Up</span>
                       )}
@@ -3375,11 +3563,11 @@ export default function App() {
                     <EditableText tag="span" fieldKey="followTitle" content={visualContent} updateContent={updateVisualContent} isEditMode={isVisualEditMode} />
                  </h4>
                  <div className="flex gap-4">
-                   <a href={isVisualEditMode ? "#" : companyInfo?.facebook} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Facebook size={24}/></a>
-                   <a href={isVisualEditMode ? "#" : "https://youtube.com/@startupupofficial?si=dmoPEcMTw5okXPMn"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Youtube size={24}/></a>
-                   <a href={isVisualEditMode ? "#" : companyInfo?.line} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><MessageCircle size={24}/></a>
-                   <a href={isVisualEditMode ? "#" : "https://www.instagram.com/startupuprealestate/"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Instagram size={24}/></a>
-                   <a href={isVisualEditMode ? "#" : "https://www.tiktok.com/@startupupofficial"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Video size={24}/></a>
+                   <a href={isVisualEditMode ? "#" : companyInfo?.facebook} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Facebook size={24}/></a>
+                   <a href={isVisualEditMode ? "#" : "https://youtube.com/@startupupofficial?si=dmoPEcMTw5okXPMn"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Youtube size={24}/></a>
+                   <a href={isVisualEditMode ? "#" : companyInfo?.line} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><MessageCircle size={24}/></a>
+                   <a href={isVisualEditMode ? "#" : "https://www.instagram.com/startupuprealestate/"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Instagram size={24}/></a>
+                   <a href={isVisualEditMode ? "#" : "https://www.tiktok.com/@startupupofficial"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Video size={24}/></a>
                  </div>
               </div>
             </div>
