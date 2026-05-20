@@ -4,21 +4,9 @@ export default function Document() {
   return (
     <Html lang="th">
       <Head>
-        {/* โหลด Tailwind ผ่าน CDN แบบด่วน */}
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script dangerouslySetInnerHTML={{
-          __html: `
-            tailwind.config = {
-              theme: {
-                extend: {
-                  colors: { brand: { green: '#0b3d1b', light: '#eef3f0' } },
-                  fontFamily: { sans: ['Prompt', 'sans-serif'] },
-                  boxShadow: { 'soft': '0 20px 50px -12px rgba(11, 61, 27, 0.15)' }
-                }
-              }
-            }
-          `
-        }} />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@200;300;400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
       <body>
         <Main />

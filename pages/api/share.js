@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, getDoc, query, where, limit } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDsEeGxKA90-URCn06F-K3U2dvlISf_2Jo",
@@ -10,126 +10,187 @@ const firebaseConfig = {
   appId: "1:750265634166:web:a4f6cd0a59db8c685fbe57"
 };
 
-// Initialize Firebase (ป้องกันการ Init ซ้ำในฝั่ง Server)
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+const appId = "startup-up-realestate";
+const SITE_URL = 'https://www.startupup-real-estate.com';
+const FALLBACK_LOGO = 'https://res.cloudinary.com/dm2wr55r5/image/upload/v1773023427/LOGO_%E0%B9%80%E0%B8%82%E0%B8%B5%E0%B8%A2%E0%B8%A7%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87_vhyhyo.png';
+
+const safeDecode = (value) => {
+  try { return decodeURIComponent(value); } catch { return value; }
+};
+
+const normalize = (value) => String(value || '').toLowerCase().trim();
+
+const escapeHtml = (value) => String(value || '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const toSafeHttpUrl = (value, fallback = FALLBACK_LOGO) => {
+  try {
+    const url = new URL(String(value || ''), SITE_URL);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const isPreviewBot = (userAgent = '') => (
+  /facebookexternalhit|facebot|twitterbot|discordbot|slackbot|whatsapp|telegrambot|linkedinbot|pinterest|line-poker|bot|crawler|spider|preview/i
+    .test(userAgent)
+);
+
 const generatePropSlug = (p) => {
-    if (!p) return '';
-    if (p.custom_id) return encodeURIComponent(p.custom_id);
-    return p.id; 
+  if (!p) return '';
+  if (p.custom_id) return encodeURIComponent(p.custom_id);
+  return p.id;
+};
+
+const matchesPropertySlug = (p, slug) => {
+  const target = normalize(safeDecode(slug));
+  const customId = normalize(p.custom_id);
+  const houseNo = normalize(p.house_number);
+  const docId = normalize(p.id);
+  const genSlug = normalize(generatePropSlug(p));
+  const decodedGenSlug = normalize(safeDecode(genSlug));
+
+  return customId === target ||
+    houseNo === target ||
+    docId === target ||
+    genSlug === target ||
+    decodedGenSlug === target ||
+    customId.replace(/\//g, '-') === target ||
+    houseNo.replace(/\//g, '-') === target;
+};
+
+const getSlugCandidates = (slug) => {
+  const decoded = safeDecode(slug).trim();
+  return Array.from(new Set([
+    slug,
+    decoded,
+    decoded.replace(/-/g, '/'),
+    slug.replace(/-/g, '/')
+  ].filter(Boolean)));
+};
+
+const findPropertyBySlug = async (propertySlug) => {
+  const propsRef = collection(db, 'artifacts', appId, 'public', 'data', 'properties');
+  const candidates = getSlugCandidates(propertySlug);
+
+  for (const candidate of candidates) {
+    if (!candidate.includes('/')) {
+      const directSnap = await getDoc(doc(propsRef, candidate));
+      if (directSnap.exists()) return { id: directSnap.id, ...directSnap.data() };
+    }
+  }
+
+  const queryValues = Array.from(new Set(candidates.flatMap((candidate) => {
+    const asNumber = Number(candidate);
+    return Number.isFinite(asNumber) && String(asNumber) === candidate ? [candidate, asNumber] : [candidate];
+  })));
+
+  for (const fieldName of ['custom_id', 'house_number']) {
+    for (const value of queryValues) {
+      const snapshot = await getDocs(query(propsRef, where(fieldName, '==', value), limit(1)));
+      if (!snapshot.empty) {
+        const found = snapshot.docs[0];
+        return { id: found.id, ...found.data() };
+      }
+    }
+  }
+
+  const snapshot = await getDocs(propsRef);
+  const properties = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  return properties.find((item) => matchesPropertySlug(item, propertySlug));
 };
 
 export default async function handler(req, res) {
-  const propertySlug = req.query.property;
+  const propertySlug = Array.isArray(req.query.property) ? req.query.property[0] : req.query.property;
 
-  // หากไม่มี property ส่งมา ให้เด้งกลับหน้าหลัก
   if (!propertySlug) {
-    return res.redirect('/');
+    return res.redirect(307, '/');
+  }
+
+  const redirectTarget = `/?property=${encodeURIComponent(propertySlug)}`;
+
+  if (!isPreviewBot(req.headers['user-agent'] || '')) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.redirect(307, redirectTarget);
   }
 
   try {
-    // 1. ดึงข้อมูลจาก Firestore
-    const propsRef = collection(db, 'artifacts', 'startup-up-realestate', 'public', 'data', 'properties');
-    const snapshot = await getDocs(propsRef);
-    const properties = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const prop = await findPropertyBySlug(propertySlug);
 
-    // 2. ค้นหาบ้านที่ตรงกับ property URL Parameter
-    let target = decodeURIComponent(propertySlug).toLowerCase().trim();
-    
-    let prop = properties.find(p => {
-        const customId = String(p.custom_id || '').toLowerCase().trim();
-        const houseNo = String(p.house_number || '').toLowerCase().trim();
-        const docId = String(p.id || '').toLowerCase().trim();
-        const genSlug = String(generatePropSlug(p)).toLowerCase().trim();
-        let decodedGenSlug = genSlug;
-        try { decodedGenSlug = decodeURIComponent(genSlug); } catch(e) {}
-        
-        return customId === target || 
-               houseNo === target || 
-               docId === target ||
-               genSlug === target ||
-               decodedGenSlug === target ||
-               customId.replace(/\//g, '-') === target ||
-               houseNo.replace(/\//g, '-') === target;
-    });
-
-    // 3. กำหนดค่าเริ่มต้นสำหรับ Meta Tags
     let title = 'STARTUP UP - จุดเริ่มต้นของคนอยากมีบ้าน';
     let description = 'ค้นหาบ้าน ทาวน์เฮาส์ บ้านเดี่ยว ทำเลดี พร้อมบริการสินเชื่อ';
-    let imageUrl = 'https://res.cloudinary.com/dm2wr55r5/image/upload/v1773023427/LOGO_%E0%B9%80%E0%B8%82%E0%B8%B5%E0%B8%A2%E0%B8%A7%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87_vhyhyo.png';
+    let imageUrl = FALLBACK_LOGO;
 
-    // 4. หากเจอข้อมูลบ้าน ให้อัปเดต Meta Tags
     if (prop) {
-        const propName = prop.project_name || '';
-        const houseNo = prop.house_number ? `บ้านเลขที่ ${prop.house_number}` : '';
-        title = `${propName} ${houseNo} | STARTUP UP`;
-        
-        if (prop.price) {
-            description = `ราคา: ฿ ${Number(String(prop.price).replace(/,/g, '')).toLocaleString()} | ${prop.main_location || prop.district || ''}`;
-        }
-        
-        imageUrl = (prop.images && prop.images.length > 0) ? prop.images[0] : (prop.imageUrl || imageUrl);
-        
-        // 🟢 แก้ไข: บังคับให้เป็น f_jpg เพื่อให้ Facebook Messenger อ่านรูปออก 100%
-        if (imageUrl.includes('cloudinary.com')) {
-            imageUrl = imageUrl.replace('/upload/', `/upload/f_jpg,q_auto,w_1200,h_630,c_limit/`);
-        }
+      const propName = prop.project_name || '';
+      const houseNo = prop.house_number ? `บ้านเลขที่ ${prop.house_number}` : '';
+      title = `${propName} ${houseNo} | STARTUP UP`.trim();
+
+      if (prop.price) {
+        const price = Number(String(prop.price).replace(/,/g, ''));
+        description = `ราคา: ฿ ${Number.isFinite(price) ? price.toLocaleString() : prop.price} | ${prop.main_location || prop.district || ''}`;
+      }
+
+      imageUrl = (prop.images && prop.images.length > 0) ? prop.images[0] : (prop.imageUrl || imageUrl);
+      if (typeof imageUrl === 'string' && imageUrl.includes('cloudinary.com')) {
+        imageUrl = imageUrl.replace('/upload/', '/upload/f_jpg,q_auto,w_1200,h_630,c_limit/');
+      }
     }
 
-    // 🟢 แก้ไข: เปลี่ยนโดเมนให้เป็นเว็บหลักปัจจุบัน (v2)
-    const currentDomain = 'https://www.startupup-real-estate.com';
+    const safeTitle = escapeHtml(title);
+    const safeDescription = escapeHtml(description);
+    const safeImageUrl = escapeHtml(toSafeHttpUrl(imageUrl));
+    const safeShareUrl = `${SITE_URL}/api/share?property=${encodeURIComponent(propertySlug)}`;
+    const redirectScriptTarget = JSON.stringify(redirectTarget);
 
-    // 5. สร้าง HTML ส่งกลับไป (มี Meta tags สำหรับ Bot และ Script ย้ายหน้าสำหรับผู้ใช้)
-    const html = `
-    <!DOCTYPE html>
-    <html lang="th">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${title}</title>
-        
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="${title}" />
-        <meta property="og:description" content="${description}" />
-        <meta property="og:image" content="${imageUrl}" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:url" content="${currentDomain}/api/share?property=${encodeURIComponent(propertySlug)}" />
-        
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="${title}" />
-        <meta name="twitter:description" content="${description}" />
-        <meta name="twitter:image" content="${imageUrl}" />
+    const html = `<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${safeTitle}</title>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${safeTitle}">
+  <meta property="og:description" content="${safeDescription}">
+  <meta property="og:image" content="${safeImageUrl}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="${escapeHtml(safeShareUrl)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${safeTitle}">
+  <meta name="twitter:description" content="${safeDescription}">
+  <meta name="twitter:image" content="${safeImageUrl}">
+  <meta http-equiv="refresh" content="0;url=${escapeHtml(redirectTarget)}">
+  <script>window.location.replace(${redirectScriptTarget});</script>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; color: #555; }
+    .loader { border: 4px solid #eef3f0; border-top: 4px solid #0b3d1b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div style="text-align:center">
+    <img src="${escapeHtml(FALLBACK_LOGO)}" alt="Startup Up" style="width:120px;margin-bottom:20px">
+    <div class="loader"></div>
+    <p>กำลังพาไปยังรายละเอียดบ้าน...</p>
+    <noscript><p><a href="${escapeHtml(redirectTarget)}">เปิดรายละเอียดบ้าน</a></p></noscript>
+  </div>
+</body>
+</html>`;
 
-        <script>
-            window.location.replace("/?property=${encodeURIComponent(propertySlug)}");
-        </script>
-        
-        <style>
-          body { font-family: 'Prompt', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #ffffff; margin: 0; }
-          .loader { border: 4px solid #eef3f0; border-top: 4px solid #0b3d1b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        </style>
-    </head>
-    </head>
-    <body>
-        <div style="text-align: center;">
-            <img src="https://res.cloudinary.com/dm2wr55r5/image/upload/v1773023427/LOGO_%E0%B9%80%E0%B8%82%E0%B8%B5%E0%B8%A2%E0%B8%A7%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87_vhyhyo.png" alt="Startup Up" style="width: 120px; margin-bottom: 20px;" />
-            <div class="loader" style="margin: 0 auto 20px;"></div>
-            <p style="color: #666; font-size: 14px;">กำลังพาท่านไปยังรายละเอียดบ้าน...</p>
-        </div>
-    </body>
-    </html>
-    `;
-
-    // ตั้งค่า Header ให้ Browser และ Bot รู้ว่าเป็นหน้าเว็บ HTML
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=86400');
     res.status(200).send(html);
-
   } catch (error) {
     console.error("Error generating share page:", error);
-    // หากระบบพังระหว่างดึงข้อมูล ให้ Redirect กลับไปที่หน้าบ้านแบบธรรมดา
-    res.redirect(`/?property=${encodeURIComponent(propertySlug)}`);
+    res.redirect(307, redirectTarget);
   }
 }

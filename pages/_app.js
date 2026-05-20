@@ -1,4 +1,5 @@
-import '../styles/globals.css' // บรรทัดนี้แหละที่ดึงความสวยมาใช้!
+import 'leaflet/dist/leaflet.css'
+import '../styles/globals.css'
 
 export default function App({ Component, pageProps }) {
   return <Component {...pageProps} />

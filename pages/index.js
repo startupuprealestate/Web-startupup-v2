@@ -15,7 +15,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Home, MapPin, Bed, Bath, Car, Maximize, Phone, MessageCircle, Menu, X, Plus, Trash2, ShieldCheck, CheckCircle, Calculator, Users, FileText, Settings, Edit, Save, Image as ImageIcon, Layout, ChevronLeft, ChevronRight, ChevronDown, Upload, Briefcase, XCircle, Tag, Loader, Video, Check, Calendar, FolderPlus, Map as MapIcon, Search, AlertTriangle, AlertCircle, Star, ClipboardCheck, Type, LayoutTemplate, Compass } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
@@ -41,7 +41,7 @@ const firebaseConfig = {
   measurementId: "G-1HZQ3RCXWP"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
@@ -532,13 +532,17 @@ function PropertyMap({ properties, onSelectProp }) {
   useEffect(() => {
       if (!mapRef.current) return;
       
-      let initTimer;
-      const initMap = () => {
-          if (!window.L) {
-              initTimer = setTimeout(initMap, 100);
+      let cancelled = false;
+      const initMap = async () => {
+          let L;
+          try {
+              L = (await import('leaflet')).default;
+          } catch (error) {
+              console.warn('Unable to load Leaflet map bundle:', error);
               return;
           }
-          const L = window.L;
+
+          if (cancelled || !mapRef.current) return;
 
           if (!mapInstance.current) {
               mapInstance.current = L.map(mapRef.current, {
@@ -746,7 +750,7 @@ function PropertyMap({ properties, onSelectProp }) {
       };
       
       initMap();
-      return () => clearTimeout(initTimer);
+      return () => { cancelled = true; };
   }, [properties]);
 
   return (
@@ -765,8 +769,6 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
   const [isPaused, setIsPaused] = useState(false);
 
   const availableProps = properties;
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin text-brand-green" size={48} /></div>;
-
   const locData = visualContent?.locations || DEFAULT_LOCATIONS_DATA;
   const locationCards = locData.map(loc => {
       const count = availableProps.filter(p => p.main_location === loc.area || (!p.main_location && p.district === loc.area)).length;
@@ -808,6 +810,8 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
           scrollContainerRef.current.scrollBy({ left: direction * itemWidth, behavior: 'smooth' });
       }
   };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader className="animate-spin text-brand-green" size={48} /></div>;
 
   const padArray = (arr, length) => {
       const result = [...arr];
@@ -1261,9 +1265,9 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
          <div className="lg:w-[60%] space-y-6 flex flex-col order-1 w-full reveal-on-scroll">
             
             <div>
-                <a href="/" onClick={(e) => { if (!e.ctrlKey && !e.metaKey && !e.button) { e.preventDefault(); onBack(); } }} className="flex items-center gap-2 text-gray-500 hover:text-brand-green transition-colors text-sm uppercase tracking-wide inline-flex mb-2 cursor-pointer hover:-translate-x-2 transition-transform">
+                <button type="button" onClick={onBack} className="flex items-center gap-2 text-gray-500 hover:text-brand-green transition-colors text-sm uppercase tracking-wide inline-flex mb-2 cursor-pointer hover:-translate-x-2 transition-transform">
                    <ChevronLeft size={16} /> ย้อนกลับ
-                </a>
+                </button>
             </div>
 
             <div className="mb-2">
@@ -1695,7 +1699,7 @@ function PortfolioSection({ companyInfo, properties, visualContent, updateVisual
                             className="break-inside-avoid rounded-xl overflow-hidden bg-gray-100 animate-pop shadow-sm hover:shadow-md cursor-pointer group mb-4 relative" 
                             style={{ animationDelay: `${(i % IMAGES_PER_PAGE) * 30}ms` }}
                         >
-                            <img src={getOptimizedImg(img, 800)} className="w-full h-auto group-hover:scale-105 transition duration-500"/>
+                            <img src={getOptimizedImg(img, 800)} className="w-full h-auto group-hover:scale-105 transition duration-500" alt={`Portfolio image ${startIndex + i + 1}`}/>
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                                 <Maximize size={32} className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
                             </div>
@@ -1746,7 +1750,7 @@ function PortfolioSection({ companyInfo, properties, visualContent, updateVisual
                   return (
                       <div key={idx} onClick={() => handleOpenAlbum(yearGroup.year)} className="group cursor-pointer animate-pop" style={{ animationDelay: `${idx * 30}ms` }}>
                           <div className="aspect-square rounded-2xl overflow-hidden bg-gray-100 relative shadow-sm group-hover:shadow-md transition-all duration-300">
-                              <img src={getOptimizedImg(coverImg, 600)} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                              <img src={getOptimizedImg(coverImg, 600)} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt={`Portfolio ${yearGroup.year}`} />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
                               <div className="absolute bottom-4 left-4 right-4 text-white">
                                   <div className="flex items-center gap-2 mb-1">
@@ -2294,7 +2298,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                 {filteredProperties.map(p => (
                                     <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 items-center">
                                         <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden relative bg-gray-100 flex-shrink-0">
-                                            <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/300x300", 300)} className="w-full h-full object-cover"/>
+                                            <img src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/300x300", 300)} className="w-full h-full object-cover" alt={p.project_name || 'Property image'}/>
                                         </div>
                                         <div className="flex-1 w-full text-center sm:text-left">
                                             <h4 className="font-medium line-clamp-1">{p.project_name}</h4>
@@ -2414,7 +2418,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                         <div className="grid grid-cols-3 gap-2 mb-4">
                                             {imagesPreview.map((img, i) => (
                                                 <div key={i} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden border">
-                                                    <img src={img} className="w-full h-full object-cover"/>
+                                                    <img src={img} className="w-full h-full object-cover" alt={`Property image ${i + 1}`}/>
                                                     
                                                     <button type="button" onClick={()=>removeImage(i)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition z-10 shadow-sm" title="ลบรูปภาพ">
                                                         <X size={12}/>
@@ -2475,7 +2479,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                             <div className="absolute inset-0 flex items-center justify-center bg-gray-200"><Loader className="animate-spin text-brand-green" size={24} /></div>
                                         ) : (
                                             <>
-                                                <img src={getOptimizedImg(companyForm.logoUrl, 300)} className="w-full h-full object-cover"/>
+                                                <img src={getOptimizedImg(companyForm.logoUrl, 300)} className="w-full h-full object-cover" alt="Company logo"/>
                                                 <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer text-xs w-full h-full transition">
                                                     <Upload size={16}/>เปลี่ยน
                                                     <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
@@ -2528,7 +2532,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                                 {yg.images.map((img, i) => (
                                                     <div key={i} className="aspect-square bg-gray-100 rounded-lg relative group overflow-hidden border">
-                                                        <img src={getOptimizedImg(img, 300)} className="w-full h-full object-contain"/>
+                                                        <img src={getOptimizedImg(img, 300)} className="w-full h-full object-contain" alt={`Portfolio ${yg.year} image ${i + 1}`}/>
                                                         
                                                         <button onClick={()=>removePortfolioImageInYear(yg.year, i)} className="absolute top-1 right-1 bg-red-500 text-white p-1.5 rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition z-10 shadow-sm" title="ลบรูปภาพ"><X size={14}/></button>
                                                         
@@ -2571,7 +2575,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                             <Loader className="animate-spin text-brand-green" size={32} />
                                         ) : popupForm.imageUrl ? (
                                             <>
-                                                <img src={getOptimizedImg(popupForm.imageUrl, 600)} className="w-full h-full object-contain" />
+                                                <img src={getOptimizedImg(popupForm.imageUrl, 600)} className="w-full h-full object-contain" alt="Promotion popup" />
                                                 <label className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition">
                                                     <Upload size={24} className="mb-2"/> เปลี่ยนรูปภาพ
                                                     <input type="file" accept="image/*" className="hidden" onChange={handlePopupImageUpload} />
@@ -2689,31 +2693,6 @@ export default function App() {
 
   const [requestedPropSlug, setRequestedPropSlug] = useState(null);
 
-  // Dynamic Injection of Leaflet & Fonts (To make sure it's fully standalone)
-  useEffect(() => {
-      if (!document.getElementById('leaflet-css')) {
-          const link = document.createElement('link');
-          link.id = 'leaflet-css';
-          link.rel = 'stylesheet';
-          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-          document.head.appendChild(link);
-      }
-      if (!document.getElementById('leaflet-js')) {
-          const script = document.createElement('script');
-          script.id = 'leaflet-js';
-          script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-          script.async = true;
-          document.head.appendChild(script);
-      }
-      if (!document.getElementById('google-fonts-prompt')) {
-          const link = document.createElement('link');
-          link.id = 'google-fonts-prompt';
-          link.rel = 'stylesheet';
-          link.href = 'https://fonts.googleapis.com/css2?family=Prompt:wght@200;300;400;500;600;700&display=swap';
-          document.head.appendChild(link);
-      }
-  }, []);
-
   useEffect(() => {
       window.scrollTo(0, 0);
   }, [activeTab, selectedProperty, searchParams]);
@@ -2755,7 +2734,13 @@ export default function App() {
 
   useEffect(() => {
       if (loading || !requestedPropSlug) return;
-      if (properties.length === 0) return;
+      if (properties.length === 0) {
+          showGlobalAlert('ไม่พบข้อมูล', 'ยังโหลดข้อมูลบ้านไม่ได้ในตอนนี้ ระบบจะพากลับหน้าหลักก่อน', 'error');
+          setRequestedPropSlug(null);
+          setSelectedProperty(null);
+          setActiveTab('home');
+          return;
+      }
 
       let target = requestedPropSlug;
       try { target = decodeURIComponent(target); } catch(e) {}
@@ -2930,7 +2915,10 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
         try { if (!auth.currentUser) await signInAnonymously(auth); } 
-        catch (error) { console.error(error); }
+        catch (error) { 
+            console.error(error);
+            setLoading(false);
+        }
     };
     initAuth();
 
@@ -2973,6 +2961,15 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!loading) return;
+    const timeoutId = setTimeout(() => {
+        console.warn('Initial Firebase load timed out. Showing the public page with available default content.');
+        setLoading(false);
+    }, 12000);
+    return () => clearTimeout(timeoutId);
+  }, [loading]);
 
   useEffect(() => {
     if (!user) return;
@@ -3260,7 +3257,7 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-6 lg:px-12">
             <div className="flex justify-between items-center h-20">
               <div className="w-1/3 flex justify-start items-center">
-                  <a href="/" onClick={(e) => { 
+                  <button type="button" onClick={(e) => { 
                       if (!e.ctrlKey && !e.metaKey && !e.button) { 
                           e.preventDefault(); 
                           if(isVisualEditMode) return;
@@ -3274,7 +3271,7 @@ export default function App() {
                       ) : (
                           <span className="text-xl md:text-2xl font-light tracking-[0.2em] text-brand-green uppercase whitespace-nowrap">Startup Up</span>
                       )}
-                  </a>
+                  </button>
               </div>
 
               <div className="hidden lg:flex items-center justify-center space-x-4 xl:space-x-6 w-1/3">
