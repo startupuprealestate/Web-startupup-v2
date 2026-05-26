@@ -19,6 +19,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
+import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug, matchesPropertySlug } from '../lib/firestorePublic';
 
 
 const Facebook = ({ size = 24, className = "" }) => (
@@ -323,9 +324,7 @@ const normalizeThaiSearch = (text) => {
 };
 
 const generatePropSlug = (p) => {
-  if (!p) return '';
-  if (p.custom_id) return encodeURIComponent(p.custom_id);
-  return p.id; 
+  return makePropertySlug(p);
 };
 
 // --- Lightbox Component ---
@@ -1578,7 +1577,7 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
   } else if (searchParams?.type === 'keyword') {
       const keyword = normalizeThaiSearch(searchParams.value); 
       displayProps = properties.filter(p => {
-          const propString = normalizeThaiSearch(`${p.main_location} ${p.sub_location} ${p.district} ${p.subdistrict} ${p.project_name} ${p.house_number} ${p.soi} ${p.highlights} ${p.category}`);
+          const propString = normalizeThaiSearch(`${p.custom_id} ${p.main_location} ${p.sub_location} ${p.district} ${p.subdistrict} ${p.province} ${p.zipcode} ${p.project_name} ${p.house_number} ${p.soi} ${p.highlights} ${p.category} ${p.badge} ${p.price}`);
           return propString.includes(keyword);
       });
       title = `ผลการค้นหา: "${searchParams.value}"`;
@@ -1999,9 +1998,18 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     useEffect(() => { if (popupData) setPopupForm(popupData); }, [popupData]);
 
     useEffect(() => {
-        fetch('https://raw.githubusercontent.com/earthchie/jquery.Thailand.js/master/jquery.Thailand.js/database/raw_database/raw_database.json')
-            .then(res => res.json())
+        const controller = new AbortController();
+        let isCancelled = false;
+
+        fetch('https://raw.githubusercontent.com/earthchie/jquery.Thailand.js/master/jquery.Thailand.js/database/raw_database/raw_database.json', {
+            signal: controller.signal
+        })
+            .then(res => {
+                if (!res.ok) throw new Error(`Thai address data request failed (${res.status})`);
+                return res.json();
+            })
             .then(data => {
+                if (isCancelled) return;
                 const db = {};
                 data.forEach(item => {
                     const zip = item.zipcode.toString();
@@ -2012,7 +2020,16 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                 });
                 setThaiAddressData(db);
             })
-            .catch(err => console.error('Failed to load thai address data', err));
+            .catch(err => {
+                if (err?.name !== 'AbortError') {
+                    console.warn('Thai address data is unavailable. Zipcode autocomplete will be disabled.', err);
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+            controller.abort();
+        };
     }, []);
 
     const filteredProperties = properties.filter(p => 
@@ -2842,26 +2859,7 @@ export default function App() {
           return;
       }
 
-      let target = requestedPropSlug;
-      try { target = decodeURIComponent(target); } catch(e) {}
-      target = target.toLowerCase().trim();
-      
-      let prop = properties.find(p => {
-          const customId = String(p.custom_id || '').toLowerCase().trim();
-          const houseNo = String(p.house_number || '').toLowerCase().trim();
-          const docId = String(p.id || '').toLowerCase().trim();
-          const genSlug = String(generatePropSlug(p)).toLowerCase().trim();
-          let decodedGenSlug = genSlug;
-          try { decodedGenSlug = decodeURIComponent(genSlug); } catch(e) {}
-          
-          return customId === target || 
-                 houseNo === target || 
-                 docId === target ||
-                 genSlug === target ||
-                 decodedGenSlug === target ||
-                 customId.replace(/\//g, '-') === target ||
-                 houseNo.replace(/\//g, '-') === target;
-      });
+      const prop = properties.find(p => matchesPropertySlug(p, requestedPropSlug));
 
       if (prop) { 
           setSelectedProperty(prop); 
@@ -3017,7 +3015,6 @@ export default function App() {
         try { if (!auth.currentUser) await signInAnonymously(auth); } 
         catch (error) { 
             console.error(error);
-            setLoading(false);
         }
     };
     initAuth();
@@ -3067,34 +3064,62 @@ export default function App() {
     const timeoutId = setTimeout(() => {
         console.warn('Initial Firebase load timed out. Showing the public page with available default content.');
         setLoading(false);
-    }, 12000);
+    }, 20000);
     return () => clearTimeout(timeoutId);
   }, [loading]);
 
   useEffect(() => {
-    if (!user) return;
-    
     const qProps = query(collection(db, 'artifacts', appId, 'public', 'data', 'properties'));
     const companyRef = doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main');
     const visualRef = doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'visual');
     const popupRef = doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'popup');
-    const canManageSite = userRole === 'host' || userRole === 'admin';
+    const canManageSite = Boolean(user) && (userRole === 'host' || userRole === 'admin');
 
-    const applyPropertiesSnapshot = (snapshot) => {
-      const props = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      props.sort((a, b) => {
+    const sortProperties = (items = []) => {
+      const props = [...items];
+      return props.sort((a, b) => {
          if (a.badge === 'Sold Out' && b.badge !== 'Sold Out') return 1;
          if (a.badge !== 'Sold Out' && b.badge === 'Sold Out') return -1;
          return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
       });
-      setProperties(props);
+    };
+
+    const applyPropertiesData = (items = []) => {
+      setProperties(sortProperties(items));
       setLoading(false);
+    };
+
+    const snapshotToProperties = (snapshot) => snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+
+    const applyPropertiesSnapshot = (snapshot) => {
+      applyPropertiesData(snapshotToProperties(snapshot));
+    };
+
+    const stripRestDocumentId = (data) => {
+      const cleaned = { ...data };
+      delete cleaned.id;
+      return cleaned;
+    };
+
+    const applyCompanyData = (data) => {
+      if (data) {
+          const companyData = stripRestDocumentId(data);
+          setCompanyInfo({ ...DEFAULT_COMPANY_INFO, ...companyData });
+      }
     };
 
     const applyCompanySnapshot = (docSnap) => {
       if (docSnap.exists()) {
-          setCompanyInfo({ ...DEFAULT_COMPANY_INFO, ...docSnap.data() });
+          applyCompanyData(docSnap.data());
       }
+    };
+
+    const applyVisualData = (data) => {
+        if (data) {
+            const visualData = stripRestDocumentId(data);
+            if(!visualData.locations) visualData.locations = DEFAULT_LOCATIONS_DATA;
+            setVisualContent({ ...DEFAULT_VISUAL_CONTENT, ...visualData });
+        }
     };
 
     const applyVisualSnapshot = (docSnap) => {
@@ -3105,31 +3130,84 @@ export default function App() {
         }
     };
 
-    const applyPopupSnapshot = (docSnap) => {
-        if (docSnap.exists()) {
-            setPopupData(docSnap.data());
+    const applyPopupData = (data) => {
+        if (data) {
+            const popup = stripRestDocumentId(data);
+            setPopupData(popup);
         }
     };
+
+    const applyPopupSnapshot = (docSnap) => {
+        if (docSnap.exists()) {
+            applyPopupData(docSnap.data());
+        }
+    };
+
+    const applyPublicData = ({ props, company, visual, popup }) => {
+      applyPropertiesData(props || []);
+      applyCompanyData(company);
+      applyVisualData(visual);
+      applyPopupData(popup);
+    };
+
+    const loadPublicDataFromSdk = async () => {
+      const [propsSnap, companySnap, visualSnap, popupSnap] = await Promise.all([
+        getDocs(qProps),
+        getDoc(companyRef),
+        getDoc(visualRef),
+        getDoc(popupRef)
+      ]);
+
+      return {
+        props: snapshotToProperties(propsSnap),
+        company: companySnap.exists() ? companySnap.data() : null,
+        visual: visualSnap.exists() ? visualSnap.data() : null,
+        popup: popupSnap.exists() ? popupSnap.data() : null,
+      };
+    };
+
+    const loadPublicDataFromRest = async () => {
+      const [props, company, visual, popup] = await Promise.all([
+        fetchPublicCollectionRest('properties'),
+        fetchPublicDocumentRest('company_info/main'),
+        fetchPublicDocumentRest('site_settings/visual'),
+        fetchPublicDocumentRest('site_settings/popup')
+      ]);
+
+      return { props, company, visual, popup };
+    };
+
+    const withTimeout = (promise, timeoutMs, label) => Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+      })
+    ]);
 
     if (!canManageSite) {
       let isCancelled = false;
       const loadPublicData = async () => {
+        let sdkData = null;
         try {
-          const [propsSnap, companySnap, visualSnap, popupSnap] = await Promise.all([
-            getDocs(qProps),
-            getDoc(companyRef),
-            getDoc(visualRef),
-            getDoc(popupRef)
-          ]);
+          sdkData = await withTimeout(loadPublicDataFromSdk(), 6000, 'Public data SDK load');
+          const publicData = sdkData.props.length > 0 ? sdkData : await loadPublicDataFromRest();
           if (isCancelled) return;
-          applyPropertiesSnapshot(propsSnap);
-          applyCompanySnapshot(companySnap);
-          applyVisualSnapshot(visualSnap);
-          applyPopupSnapshot(popupSnap);
+          applyPublicData(publicData);
         } catch (error) {
-          if (!isCancelled) {
-            console.warn(error);
-            setLoading(false);
+          console.warn('Public data SDK load failed, trying REST fallback.', error);
+          try {
+            const publicData = await loadPublicDataFromRest();
+            if (isCancelled) return;
+            applyPublicData(publicData);
+          } catch (fallbackError) {
+            if (!isCancelled) {
+              console.warn('Public data REST fallback failed.', fallbackError);
+              if (sdkData) {
+                applyPublicData(sdkData);
+              } else {
+                setLoading(false);
+              }
+            }
           }
         }
       };

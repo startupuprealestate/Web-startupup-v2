@@ -41,6 +41,7 @@ const contentSecurityPolicy = [
     "https://*.googleapis.com",
     "https://*.google.com",
     "https://*.gstatic.com",
+    "https://raw.githubusercontent.com",
     "https://identitytoolkit.googleapis.com",
     "https://securetoken.googleapis.com",
     "https://firebaseinstallations.googleapis.com",

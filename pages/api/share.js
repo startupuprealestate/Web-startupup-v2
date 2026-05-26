@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, getDoc, query, where, limit } from 'firebase/firestore';
+import { decodeRepeatedly, fetchPublicCollectionRest, matchesPropertySlug } from '../../lib/firestorePublic';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDsEeGxKA90-URCn06F-K3U2dvlISf_2Jo",
@@ -16,12 +17,6 @@ const db = getFirestore(app);
 const appId = "startup-up-realestate";
 const SITE_URL = 'https://www.startupup-real-estate.com';
 const FALLBACK_LOGO = 'https://res.cloudinary.com/dm2wr55r5/image/upload/v1773023427/LOGO_%E0%B9%80%E0%B8%82%E0%B8%B5%E0%B8%A2%E0%B8%A7%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87_vhyhyo.png';
-
-const safeDecode = (value) => {
-  try { return decodeURIComponent(value); } catch { return value; }
-};
-
-const normalize = (value) => String(value || '').toLowerCase().trim();
 
 const escapeHtml = (value) => String(value || '')
   .replace(/&/g, '&amp;')
@@ -44,31 +39,8 @@ const isPreviewBot = (userAgent = '') => (
     .test(userAgent)
 );
 
-const generatePropSlug = (p) => {
-  if (!p) return '';
-  if (p.custom_id) return encodeURIComponent(p.custom_id);
-  return p.id;
-};
-
-const matchesPropertySlug = (p, slug) => {
-  const target = normalize(safeDecode(slug));
-  const customId = normalize(p.custom_id);
-  const houseNo = normalize(p.house_number);
-  const docId = normalize(p.id);
-  const genSlug = normalize(generatePropSlug(p));
-  const decodedGenSlug = normalize(safeDecode(genSlug));
-
-  return customId === target ||
-    houseNo === target ||
-    docId === target ||
-    genSlug === target ||
-    decodedGenSlug === target ||
-    customId.replace(/\//g, '-') === target ||
-    houseNo.replace(/\//g, '-') === target;
-};
-
 const getSlugCandidates = (slug) => {
-  const decoded = safeDecode(slug).trim();
+  const decoded = decodeRepeatedly(slug).trim();
   return Array.from(new Set([
     slug,
     decoded,
@@ -77,34 +49,53 @@ const getSlugCandidates = (slug) => {
   ].filter(Boolean)));
 };
 
+const withTimeout = (promise, timeoutMs, label) => Promise.race([
+  promise,
+  new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+  })
+]);
+
 const findPropertyBySlug = async (propertySlug) => {
   const propsRef = collection(db, 'artifacts', appId, 'public', 'data', 'properties');
   const candidates = getSlugCandidates(propertySlug);
 
-  for (const candidate of candidates) {
-    if (!candidate.includes('/')) {
-      const directSnap = await getDoc(doc(propsRef, candidate));
-      if (directSnap.exists()) return { id: directSnap.id, ...directSnap.data() };
-    }
-  }
-
-  const queryValues = Array.from(new Set(candidates.flatMap((candidate) => {
-    const asNumber = Number(candidate);
-    return Number.isFinite(asNumber) && String(asNumber) === candidate ? [candidate, asNumber] : [candidate];
-  })));
-
-  for (const fieldName of ['custom_id', 'house_number']) {
-    for (const value of queryValues) {
-      const snapshot = await getDocs(query(propsRef, where(fieldName, '==', value), limit(1)));
-      if (!snapshot.empty) {
-        const found = snapshot.docs[0];
-        return { id: found.id, ...found.data() };
+  const findWithSdk = async () => {
+    for (const candidate of candidates) {
+      if (!candidate.includes('/')) {
+        const directSnap = await getDoc(doc(propsRef, candidate));
+        if (directSnap.exists()) return { id: directSnap.id, ...directSnap.data() };
       }
     }
+
+    const queryValues = Array.from(new Set(candidates.flatMap((candidate) => {
+      const asNumber = Number(candidate);
+      return Number.isFinite(asNumber) && String(asNumber) === candidate ? [candidate, asNumber] : [candidate];
+    })));
+
+    for (const fieldName of ['custom_id', 'house_number']) {
+      for (const value of queryValues) {
+        const snapshot = await getDocs(query(propsRef, where(fieldName, '==', value), limit(1)));
+        if (!snapshot.empty) {
+          const found = snapshot.docs[0];
+          return { id: found.id, ...found.data() };
+        }
+      }
+    }
+
+    const snapshot = await getDocs(propsRef);
+    const properties = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    return properties.find((item) => matchesPropertySlug(item, propertySlug));
+  };
+
+  try {
+    const matched = await withTimeout(findWithSdk(), 5000, 'Firestore SDK share lookup');
+    if (matched) return matched;
+  } catch (error) {
+    console.warn('Firestore SDK share lookup failed, trying REST fallback.', error);
   }
 
-  const snapshot = await getDocs(propsRef);
-  const properties = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  const properties = await fetchPublicCollectionRest('properties');
   return properties.find((item) => matchesPropertySlug(item, propertySlug));
 };
 
