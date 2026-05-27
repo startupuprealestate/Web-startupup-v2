@@ -115,6 +115,8 @@ const DEFAULT_VISUAL_CONTENT = {
 };
 
 const CATEGORIES = ['ทาวน์เฮาส์', 'ทาวน์เฮาส์ชั้นเดียว', 'ทาวน์เฮาส์หลังริม', 'บ้านแฝด', 'บ้านเดี่ยว'];
+const PROPERTY_OWNERS = ['Startup Up', 'Naphat', 'เจ๊หมวย', 'ใบชา', 'ฝากขาย'];
+const DEFAULT_PROPERTY_OWNER = PROPERTY_OWNERS[0];
 const BADGES = [
   { value: '', label: '- ปกติ (ขายทั่วไป) -' },
   { value: 'Promotion', label: 'Promotion (โปรโมชั่น)' },
@@ -1970,7 +1972,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     const [isUploadingPortfolio, setIsUploadingPortfolio] = useState({ state: false, year: null });
 
     // Forms
-    const initialForm = { custom_id: '', project_name: '', category: 'ทาวน์เฮาส์', price: '', status: 'available', badge: '', house_number: '', soi: '', zipcode: '', subdistrict: '', district: '', province: '', area_wah: '', area_sqm: '', floors: '', bedrooms: '', bathrooms: '', parking: '', direction: '', lat: '', lng: '', highlights: '', facilitiesList: [], images: [], youtubeUrl: '', main_location: '', sub_location: '' };
+    const initialForm = { custom_id: '', project_name: '', property_owner: DEFAULT_PROPERTY_OWNER, category: 'ทาวน์เฮาส์', price: '', status: 'available', badge: '', house_number: '', soi: '', zipcode: '', subdistrict: '', district: '', province: '', area_wah: '', area_sqm: '', floors: '', bedrooms: '', bathrooms: '', parking: '', direction: '', lat: '', lng: '', highlights: '', facilitiesList: [], images: [], youtubeUrl: '', main_location: '', sub_location: '' };
     const [formData, setFormData] = useState(initialForm);
     const [imagesPreview, setImagesPreview] = useState([]);
     const [addressOptions, setAddressOptions] = useState([]);
@@ -2035,8 +2037,19 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     const filteredProperties = properties.filter(p => 
         p?.project_name?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
         p?.house_number?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
-        p?.custom_id?.toLowerCase()?.includes(searchTerm.toLowerCase())
+        p?.custom_id?.toLowerCase()?.includes(searchTerm.toLowerCase()) ||
+        p?.property_owner?.toLowerCase()?.includes(searchTerm.toLowerCase())
     );
+
+    const getPropertyOwner = (prop) => {
+        const owner = String(prop?.property_owner || '').trim();
+        return PROPERTY_OWNERS.includes(owner) ? owner : DEFAULT_PROPERTY_OWNER;
+    };
+
+    const groupedProperties = PROPERTY_OWNERS.map(owner => ({
+        owner,
+        items: filteredProperties.filter(prop => getPropertyOwner(prop) === owner)
+    }));
 
     const startEdit = (prop) => {
         setEditData(prop); setFormData({ ...initialForm, ...prop, facilitiesList: prop.facilitiesList || [] }); setImagesPreview(prop.images || (prop.imageUrl ? [prop.imageUrl] : []));
@@ -2179,6 +2192,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                 ...formData,
                 custom_id: formData.custom_id ? formData.custom_id.trim() : '',
                 project_name: formData.project_name.trim(),
+                property_owner: PROPERTY_OWNERS.includes(formData.property_owner) ? formData.property_owner : DEFAULT_PROPERTY_OWNER,
                 lat: safeLat,
                 lng: safeLng,
                 price: Number(String(formData.price).replace(/,/g, '')) || 0,
@@ -2408,22 +2422,40 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                     <button onClick={startNew} className="btn-primary whitespace-nowrap"><Plus size={16}/> เพิ่มใหม่</button>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 gap-4">
-                                {filteredProperties.map(p => (
-                                    <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 items-center">
-                                        <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden relative bg-gray-100 flex-shrink-0">
-                                            <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/300x300", 300)} className="w-full h-full object-cover" alt={p.project_name || 'Property image'} width={300} height={300} sizes="96px" loading="lazy" decoding="async" />
+                            <div className="grid grid-cols-1 gap-6">
+                                {groupedProperties.map(({ owner, items }) => (
+                                    <section key={owner} className="space-y-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                                            <div className="flex items-center gap-2">
+                                                <Briefcase size={16} className="text-brand-green" />
+                                                <h4 className="font-medium text-brand-green">บ้านของ {owner}</h4>
+                                            </div>
+                                            <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full">{items.length} รายการ</span>
                                         </div>
-                                        <div className="flex-1 w-full text-center sm:text-left">
-                                            <h4 className="font-medium line-clamp-1">{p.project_name}</h4>
-                                            <p className="text-xs text-gray-500 mt-1">{p.category} • {p.subdistrict}</p>
-                                            <p className="font-medium text-brand-green mt-1">{Number(String(p.price).replace(/,/g, '') || 0).toLocaleString()} ฿</p>
-                                        </div>
-                                        <div className="flex gap-2 w-full sm:w-auto justify-center">
-                                            <button onClick={() => startEdit(p)} className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-brand-green bg-gray-50 rounded-lg transition"><Edit size={18}/></button>
-                                            <button onClick={() => handleDeleteProperty(p.id)} className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-red-500 bg-gray-50 rounded-lg transition"><Trash2 size={18}/></button>
-                                        </div>
-                                    </div>
+
+                                        {items.length > 0 ? (
+                                            <div className="grid grid-cols-1 gap-4">
+                                                {items.map(p => (
+                                                    <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 items-center">
+                                                        <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden relative bg-gray-100 flex-shrink-0">
+                                                            <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/300x300", 300)} className="w-full h-full object-cover" alt={p.project_name || 'Property image'} width={300} height={300} sizes="96px" loading="lazy" decoding="async" />
+                                                        </div>
+                                                        <div className="flex-1 w-full text-center sm:text-left">
+                                                            <h4 className="font-medium line-clamp-1">{p.project_name}</h4>
+                                                            <p className="text-xs text-gray-500 mt-1">{p.category} • {p.subdistrict}</p>
+                                                            <p className="font-medium text-brand-green mt-1">{Number(String(p.price).replace(/,/g, '') || 0).toLocaleString()} ฿</p>
+                                                        </div>
+                                                        <div className="flex gap-2 w-full sm:w-auto justify-center">
+                                                            <button onClick={() => startEdit(p)} className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-brand-green bg-gray-50 rounded-lg transition"><Edit size={18}/></button>
+                                                            <button onClick={() => handleDeleteProperty(p.id)} className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-red-500 bg-gray-50 rounded-lg transition"><Trash2 size={18}/></button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-white/70 border border-dashed border-gray-200 rounded-xl px-4 py-6 text-center text-sm text-gray-400">ยังไม่มีบ้านในกลุ่มนี้</div>
+                                        )}
+                                    </section>
                                 ))}
                             </div>
                         </div>
@@ -2445,6 +2477,12 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                         <h4 className="font-medium mb-6 pb-2 border-b">ข้อมูลหลัก</h4>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div className="sm:col-span-2"><label className="label">ชื่อโครงการ <span className="text-red-500">*</span></label><input className="input-modern" required value={formData.project_name} onChange={e=>setFormData({...formData, project_name: e.target.value})}/></div>
+                                            <div className="sm:col-span-2">
+                                                <label className="label">บ้านของบริษัท/เจ้าของ</label>
+                                                <select className="input-modern" value={formData.property_owner || DEFAULT_PROPERTY_OWNER} onChange={e=>setFormData({...formData, property_owner: e.target.value})}>
+                                                    {PROPERTY_OWNERS.map(owner => <option key={owner} value={owner}>{owner}</option>)}
+                                                </select>
+                                            </div>
                                             <div><label className="label">ประเภท</label><select className="input-modern" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                                             <div><label className="label">ราคา (บาท) <span className="text-red-500">*</span></label><input type="text" inputMode="numeric" required className="input-modern font-medium text-brand-green" value={Number(String(formData.price).replace(/,/g, '') || 0).toLocaleString()} onChange={e=>setFormData({...formData, price: e.target.value.replace(/[^0-9]/g, '')})}/></div>
                                             <div className="sm:col-span-2">
