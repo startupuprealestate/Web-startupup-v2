@@ -1274,6 +1274,19 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
   const safeDist = String(property?.district || '').trim();
   const safeMainLoc = String(property?.main_location || '').trim();
 
+  const formatHouseAndSoi = () => {
+      const hn = String(property?.house_number || '').trim();
+      const soi = String(property?.soi || '').trim();
+      if (!hn && !soi) return '';
+      let out = hn ? `บ้านเลขที่ ${hn}` : '';
+      if (soi) {
+          const startsWithSoi = /^ซ(อย)?[.\s]|^Soi/i.test(soi);
+          if (startsWithSoi) out += ` ${soi}`;
+          else out += ` ซอย ${soi}`;
+      }
+      return out;
+  };
+
   const relatedProps = properties
       .filter(p => p && p.id && p.id !== property?.id)
       .map(p => {
@@ -1367,9 +1380,9 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                     {property.project_name}
                 </h1>
                 
-                {property.house_number && (
+                {(property.house_number || property.soi) && (
                     <div className="text-gray-700 text-sm md:text-base font-medium mt-1">
-                        บ้านเลขที่ {property.house_number}
+                        {formatHouseAndSoi()}
                     </div>
                 )}
 
