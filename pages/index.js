@@ -1995,7 +1995,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     const [newPortfolioYear, setNewPortfolioYear] = useState('');
     const [inviteEmail, setInviteEmail] = useState(''); const [inviteRole, setInviteRole] = useState('admin');
     const [newFacility, setNewFacility] = useState('');
-    const [thaiAddressData, setThaiAddressData] = useState({});
+    const [thaiAddressData, setThaiAddressData] = useState({ byZipcode: {}, tree: {} });
 
     const checkAccess = (requiredRole) => {
         if (requiredRole === 'host' && userRole !== 'host') {
@@ -2012,6 +2012,34 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     useEffect(() => { if (companyInfo) setCompanyForm(companyInfo); }, [companyInfo]);
     useEffect(() => { if (popupData) setPopupForm(popupData); }, [popupData]);
 
+    const provinceOptions = useMemo(() => Object.keys(thaiAddressData.tree).sort(), [thaiAddressData]);
+    const districtOptions = useMemo(() => {
+        if (!formData.province || !thaiAddressData.tree[formData.province]) return [];
+        return Object.keys(thaiAddressData.tree[formData.province]).sort();
+    }, [thaiAddressData, formData.province]);
+    const subdistrictOptions = useMemo(() => {
+        if (!formData.province || !formData.district || !thaiAddressData.tree[formData.province]?.[formData.district]) return [];
+        return Object.keys(thaiAddressData.tree[formData.province][formData.district]).sort();
+    }, [thaiAddressData, formData.province, formData.district]);
+    const zipcodeOptionsFromSelect = useMemo(() => {
+        if (!formData.province || !formData.district || !formData.subdistrict) return [];
+        return thaiAddressData.tree[formData.province]?.[formData.district]?.[formData.subdistrict] || [];
+    }, [thaiAddressData, formData.province, formData.district, formData.subdistrict]);
+
+    const handleProvinceSelection = (e) => {
+        const province = e.target.value;
+        setFormData(prev => ({ ...prev, province, district: '', subdistrict: '', zipcode: '' }));
+    };
+    const handleDistrictSelection = (e) => {
+        const district = e.target.value;
+        setFormData(prev => ({ ...prev, district, subdistrict: '', zipcode: '' }));
+    };
+    const handleSubdistrictSelection = (e) => {
+        const subdistrict = e.target.value;
+        const zipcodes = thaiAddressData.tree[formData.province]?.[formData.district]?.[subdistrict] || [];
+        setFormData(prev => ({ ...prev, subdistrict, zipcode: zipcodes[0] || '' }));
+    };
+
     useEffect(() => {
         const controller = new AbortController();
         let isCancelled = false;
@@ -2025,15 +2053,26 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             })
             .then(data => {
                 if (isCancelled) return;
-                const db = {};
+                const byZipcode = {};
+                const tree = {};
                 data.forEach(item => {
                     const zip = item.zipcode.toString();
-                    if(!db[zip]) db[zip] = [];
-                    if(!db[zip].find(x => x.subdistrict === item.district && x.district === item.amphoe && x.province === item.province)) {
-                        db[zip].push({ subdistrict: item.district, district: item.amphoe, province: item.province });
+                    if (!byZipcode[zip]) byZipcode[zip] = [];
+                    if (!byZipcode[zip].find(x => x.subdistrict === item.district && x.district === item.amphoe && x.province === item.province)) {
+                        byZipcode[zip].push({ subdistrict: item.district, district: item.amphoe, province: item.province });
+                    }
+
+                    const province = item.province;
+                    const district = item.amphoe;
+                    const subdistrict = item.district;
+                    if (!tree[province]) tree[province] = {};
+                    if (!tree[province][district]) tree[province][district] = {};
+                    if (!tree[province][district][subdistrict]) tree[province][district][subdistrict] = [];
+                    if (!tree[province][district][subdistrict].includes(zip)) {
+                        tree[province][district][subdistrict].push(zip);
                     }
                 });
-                setThaiAddressData(db);
+                setThaiAddressData({ byZipcode, tree });
             })
             .catch(err => {
                 if (err?.name !== 'AbortError') {
@@ -2066,17 +2105,17 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
 
     const startEdit = (prop) => {
         setEditData(prop); setFormData({ ...initialForm, ...prop, facilitiesList: prop.facilitiesList || [] }); setImagesPreview(prop.images || (prop.imageUrl ? [prop.imageUrl] : []));
-        if (prop.zipcode && thaiAddressData[prop.zipcode]) setAddressOptions(thaiAddressData[prop.zipcode]); else setAddressOptions([]);
+        if (prop.zipcode && thaiAddressData.byZipcode[prop.zipcode]) setAddressOptions(thaiAddressData.byZipcode[prop.zipcode]); else setAddressOptions([]);
         setIsEditing(true);
     };
     const startNew = () => { setEditData(null); setFormData(initialForm); setImagesPreview([]); setAddressOptions([]); setIsEditing(true); };
 
     const handleZipcodeChange = (e) => {
         const code = e.target.value; setFormData(prev => ({ ...prev, zipcode: code }));
-        if (thaiAddressData && thaiAddressData[code]) { 
-            setAddressOptions(thaiAddressData[code]); 
-            if (thaiAddressData[code].length === 1) { 
-                const addr = thaiAddressData[code][0]; 
+        if (thaiAddressData && thaiAddressData.byZipcode[code]) { 
+            setAddressOptions(thaiAddressData.byZipcode[code]); 
+            if (thaiAddressData.byZipcode[code].length === 1) { 
+                const addr = thaiAddressData.byZipcode[code][0]; 
                 setFormData(prev => ({ ...prev, zipcode: code, subdistrict: addr.subdistrict, district: addr.district, province: addr.province, })); 
             } else { 
                 setFormData(prev => ({ ...prev, zipcode: code, subdistrict: '', district: '', province: '' })); 
@@ -2561,10 +2600,41 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                                         <h4 className="font-medium mb-6 pb-2 border-b">ที่ตั้ง (สำหรับแสดงในแผนที่)</h4>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="sm:col-span-2"><label className="label">จังหวัด (เลือกได้)</label>
+                                                <select className="input-modern" value={formData.province} onChange={handleProvinceSelection}>
+                                                    <option value="">- เลือกจังหวัด -</option>
+                                                    {provinceOptions.map(prov => <option key={prov} value={prov}>{prov}</option>)}
+                                                </select>
+                                            </div>
+                                            {districtOptions.length > 0 && (
+                                                <div className="sm:col-span-2"><label className="label">อำเภอ (เลือกได้)</label>
+                                                    <select className="input-modern" value={formData.district} onChange={handleDistrictSelection}>
+                                                        <option value="">- เลือกอำเภอ -</option>
+                                                        {districtOptions.map(dist => <option key={dist} value={dist}>{dist}</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
+                                            {subdistrictOptions.length > 0 && (
+                                                <div className="sm:col-span-2"><label className="label">ตำบล/แขวง (เลือกได้)</label>
+                                                    <select className="input-modern" value={formData.subdistrict} onChange={handleSubdistrictSelection}>
+                                                        <option value="">- เลือกตำบล/แขวง -</option>
+                                                        {subdistrictOptions.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
                                             <div className="sm:col-span-2"><label className="label">รหัสไปรษณีย์</label><input type="text" inputMode="numeric" className="input-modern" value={formData.zipcode} onChange={handleZipcodeChange}/></div>
+                                            {zipcodeOptionsFromSelect.length > 1 && (
+                                                <div className="sm:col-span-2">
+                                                    <label className="label text-brand-green">เลือกชุดรหัสไปรษณีย์</label>
+                                                    <select className="input-modern" value={formData.zipcode} onChange={e => setFormData(prev => ({ ...prev, zipcode: e.target.value }))}>
+                                                        <option value="">- เลือก -</option>
+                                                        {zipcodeOptionsFromSelect.map(zip => <option key={zip} value={zip}>{zip}</option>)}
+                                                    </select>
+                                                </div>
+                                            )}
                                             {addressOptions.length > 1 && (
                                                 <div className="sm:col-span-2">
-                                                    <label className="label text-brand-green">เลือกตำบล/แขวง</label>
+                                                    <label className="label text-brand-green">เลือกตำบล/แขวง จากรหัสไปรษณีย์</label>
                                                     <select className="input-modern" onChange={handleAddressSelect} defaultValue=""><option value="" disabled>- เลือก -</option>{addressOptions.map((opt, idx)=><option key={idx} value={idx}>{opt.subdistrict} - {opt.district}</option>)}</select>
                                                 </div>
                                             )}
