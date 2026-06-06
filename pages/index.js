@@ -3239,10 +3239,25 @@ export default function App() {
       }
     };
 
+    const mergeLocations = (existingLocations) => {
+        // ตรวจสอบและเพิ่ม location ใหม่จาก DEFAULT_LOCATIONS_DATA
+        const merged = [...(existingLocations || [])];
+        DEFAULT_LOCATIONS_DATA.forEach(defaultLoc => {
+            const exists = merged.find(loc => loc.area === defaultLoc.area);
+            if (!exists) {
+                merged.push(defaultLoc);
+            } else {
+                // อัปเดต sub_areas ถ้ามีการเปลี่ยนแปลง
+                exists.sub_areas = defaultLoc.sub_areas;
+            }
+        });
+        return merged;
+    };
+
     const applyVisualData = (data) => {
         if (data) {
             const visualData = stripRestDocumentId(data);
-            if(!visualData.locations) visualData.locations = DEFAULT_LOCATIONS_DATA;
+            visualData.locations = mergeLocations(visualData.locations);
             setVisualContent({ ...DEFAULT_VISUAL_CONTENT, ...visualData });
         }
     };
@@ -3250,7 +3265,7 @@ export default function App() {
     const applyVisualSnapshot = (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            if(!data.locations) data.locations = DEFAULT_LOCATIONS_DATA;
+            data.locations = mergeLocations(data.locations);
             setVisualContent({ ...DEFAULT_VISUAL_CONTENT, ...data });
         }
     };
