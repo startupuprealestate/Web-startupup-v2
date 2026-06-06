@@ -64,11 +64,13 @@ const DEFAULT_COMPANY_INFO = {
 const DEFAULT_LOCATIONS_DATA = [
   { area: 'ลำลูกกา', sub_areas: ['คลองหนึ่ง', 'คลองสอง', 'คลองสาม', 'คลองสี่', 'คลองห้า', 'คลองหก', 'คลองเจ็ด', 'คลองแปด', 'คลองเก้า', 'คลองสิบ', 'คลองสิบเอ็ด'], img: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
   { area: 'คลองหลวง', sub_areas: ['คลองหนึ่ง', 'คลองสอง', 'คลองสาม', 'คลองสี่'], img: 'https://images.unsplash.com/photo-1592595896551-12b371d546d5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+
   { area: 'ธัญบุรี', sub_areas: ['คลองหนึ่ง', 'คลองสอง', 'คลองสาม', 'คลองสี่', 'คลองห้า', 'คลองหก', 'คลองเจ็ด', 'คลองแปด', 'คลองเก้า', 'คลองสิบ', 'คลองสิบเอ็ด'], img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
   { area: 'เมืองปทุมธานี', sub_areas: ['บ้านใหม่', 'บางพูน', 'บางกะดี'], img: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
   { area: 'อยุธยา', sub_areas: ['พยอม'], img: 'https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
+  { area: 'สามโคก', sub_areas: [], img: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
   { area: 'กรุงเทพมหานคร', sub_areas: ['ดอนเมือง', 'บางเขน', 'พหลโยธิน 48', 'พหลโยธิน 52', 'สายไหม'], img: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b91d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
-  { area: 'นนทบุรี', sub_areas: ['บางบัวทอง', 'ปากเกร็ด - ติวานนท์'], img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' }
+  { area: 'นนทบุรี', sub_areas: ['บางบัวทอง', 'ปากเกร็ด - ติวานนท์', 'ปิ่นเกล้า'], img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' }
 ];
 
 const DEFAULT_VISUAL_CONTENT = {
@@ -132,6 +134,7 @@ const DISTRICT_COORDS = {
   'คลองหก': [14.045, 100.725], 'คลองเจ็ด': [14.045, 100.745], 'คลองแปด': [14.045, 100.765],
   'คลองเก้า': [14.045, 100.785], 'คลองสิบ': [14.045, 100.805], 'คลองสิบเอ็ด': [14.045, 100.825],
   'ธัญบุรี': [14.000, 100.680], 'ลำลูกกา': [13.935, 100.655], 'ลาดสวาย': [13.935, 100.675],
+  'สามโคก': [14.090, 100.564], 'ปิ่นเกล้า': [13.762, 100.486],
   'เมืองปทุมธานี': [13.990, 100.525], 'ดอนเมือง': [13.923, 100.597], 'บางเขน': [13.871, 100.600],
   'สายไหม': [13.921, 100.642], 'พหลโยธิน 48': [13.882, 100.606], 'พหลโยธิน 52': [13.893, 100.611],
   'บางบัวทอง': [13.915, 100.418], 'ปากเกร็ด': [13.912, 100.498], 'ติวานนท์': [13.884, 100.518],
