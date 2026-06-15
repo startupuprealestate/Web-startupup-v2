@@ -20,6 +20,7 @@ import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProv
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
 import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug, matchesPropertySlug } from '../lib/firestorePublic';
+import { buildPageSeo, buildStructuredData, safeJsonLd } from '../lib/seo';
 
 
 const Facebook = ({ size = 24, className = "" }) => (
@@ -2931,6 +2932,16 @@ export default function App() {
   };
 
   const [requestedPropSlug, setRequestedPropSlug] = useState(null);
+  const seoMeta = useMemo(() => buildPageSeo({
+      selectedProperty,
+      activeTab,
+      searchParams,
+      companyInfo,
+  }), [selectedProperty, activeTab, searchParams, companyInfo]);
+  const structuredData = useMemo(() => buildStructuredData({
+      companyInfo,
+      selectedProperty,
+  }), [companyInfo, selectedProperty]);
 
   useEffect(() => {
       window.scrollTo(0, 0);
@@ -3021,26 +3032,12 @@ export default function App() {
   }, [activeTab, selectedProperty, searchParams, requestedPropSlug]);
 
   useEffect(() => {
-      let title = companyInfo?.name || 'STARTUP UP - จุดเริ่มต้นของคนอยากมีบ้าน';
-      let ogImage = companyInfo?.logoUrl || 'https://res.cloudinary.com/dm2wr55r5/image/upload/v1773023427/LOGO_%E0%B9%80%E0%B8%82%E0%B8%B5%E0%B8%A2%E0%B8%A7%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87_vhyhyo.png';
-
-      if (selectedProperty) {
-          const propName = selectedProperty?.project_name || '';
-          const houseNo = selectedProperty?.house_number ? `บ้านเลขที่ ${selectedProperty.house_number}` : '';
-          title = `${propName} ${houseNo} | ${companyInfo?.name || 'STARTUP UP'}`;
-          ogImage = (selectedProperty?.images && selectedProperty.images.length > 0) ? selectedProperty.images[0] : (selectedProperty?.imageUrl || ogImage);
-      } else if (activeTab === 'location' && searchParams.value) {
-          title = `ทำเล ${searchParams.value} | ${companyInfo?.name || 'STARTUP UP'}`;
-      } else if (activeTab === 'promo') {
-          title = `โปรโมชั่นพิเศษ | ${companyInfo?.name || 'STARTUP UP'}`;
-      }
-
-      document.title = title;
+      document.title = seoMeta.title;
       let metaOgImage = document.querySelector('meta[property="og:image"]');
       if (metaOgImage) {
-          metaOgImage.setAttribute('content', ogImage);
+          metaOgImage.setAttribute('content', seoMeta.image);
       }
-  }, [selectedProperty, activeTab, searchParams, companyInfo]);
+  }, [seoMeta.title, seoMeta.image]);
 
   useEffect(() => {
       const handleWheel = (e) => { if (document.activeElement && document.activeElement.type === 'number') document.activeElement.blur(); };
@@ -3570,20 +3567,40 @@ export default function App() {
     <>
       <style>{globalCss}</style>
       
-    <Head>
+      <Head>
+        <title>{seoMeta.title}</title>
+        <meta name="description" content={seoMeta.description} />
+        <meta name="robots" content={seoMeta.robots} />
+        <meta name="googlebot" content={seoMeta.robots} />
         <meta name="google-site-verification" content="yM2oXyforQdUzBPi710gJZOV8eMPIQQqlAYmuO7b73E" />
-        <title>Startup Up Real Estate | จุดเริ่มต้นของคนอยากมีบ้าน</title>
-  
-        {/* บรรทัดนี้คือตัวกำหนดข้อความในกรอบสีแดงครับ */}
-        <meta name="description" content="รวมบ้านมือสองรีโนเวทพร้อมอยู่ ย่านรังสิต คลองหลวง ลำลูกกา ปทุมธานี บริการยื่นสินเชื่อฟรี ดูแลจนถึงวันโอน" />
-  
-        {/* บรรทัดเหล่านี้ช่วยให้แสดงผลบน Facebook/LINE สวยขึ้น */}
-        <meta property="og:title" content="Startup Up Real Estate | จุดเริ่มต้นของคนอยากมีบ้าน" />
-        <meta property="og:description" content="จุดเริ่มต้นของคนอยากมีบ้าน รวมบ้านสวยรีโนเวทใหม่พร้อมอยู่" />
-  
+        <link rel="canonical" href={seoMeta.canonicalUrl} />
+        <link rel="alternate" hrefLang="th-TH" href={seoMeta.canonicalUrl} />
+
+        <meta property="og:locale" content="th_TH" />
+        <meta property="og:type" content={seoMeta.type} />
+        <meta property="og:site_name" content={companyInfo?.name || 'STARTUP UP'} />
+        <meta property="og:title" content={seoMeta.title} />
+        <meta property="og:description" content={seoMeta.description} />
+        <meta property="og:url" content={seoMeta.canonicalUrl} />
+        <meta property="og:image" content={seoMeta.image} />
+        <meta property="og:image:secure_url" content={seoMeta.image} />
+        <meta property="og:image:alt" content={seoMeta.imageAlt} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seoMeta.title} />
+        <meta name="twitter:description" content={seoMeta.description} />
+        <meta name="twitter:image" content={seoMeta.image} />
+
+        <meta name="theme-color" content="#0b3d1b" />
         <link rel="icon" type="image/png" href="/favicon-new.png" />
         <link rel="apple-touch-icon" href="/favicon-new.png" />
-    </Head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(structuredData) }}
+        />
+      </Head>
 
       <div className={`text-gray-800 bg-white min-h-screen flex flex-col font-sans relative ${isVisualEditMode ? 'pb-24 border-4 border-blue-500' : ''}`}>
         
