@@ -3571,6 +3571,7 @@ export default function App() {
       <style>{globalCss}</style>
       
     <Head>
+        <meta name="google-site-verification" content="yM2oXyforQdUzBPi710gJZOV8eMPIQQqlAYmuO7b73E" />
         <title>Startup Up Real Estate | จุดเริ่มต้นของคนอยากมีบ้าน</title>
   
         {/* บรรทัดนี้คือตัวกำหนดข้อความในกรอบสีแดงครับ */}
