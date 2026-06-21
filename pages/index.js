@@ -3573,6 +3573,7 @@ export default function App() {
         <meta name="robots" content={seoMeta.robots} />
         <meta name="googlebot" content={seoMeta.robots} />
         <meta name="google-site-verification" content="yM2oXyforQdUzBPi710gJZOV8eMPIQQqlAYmuO7b73E" />
+        <meta name="facebook-domain-verification" content="4p7fie704kzdg66pjcn4c3w8511r5s" />
         <link rel="canonical" href={seoMeta.canonicalUrl} />
         <link rel="alternate" hrefLang="th-TH" href={seoMeta.canonicalUrl} />
 
