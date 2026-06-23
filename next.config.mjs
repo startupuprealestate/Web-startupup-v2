@@ -71,6 +71,21 @@ const contentSecurityPolicy = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'startupup-real-estate.com',
+          },
+        ],
+        destination: 'https://www.startupup-real-estate.com/:path*',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -334,6 +334,11 @@ const generatePropSlug = (p) => {
   return makePropertySlug(p);
 };
 
+const getPropertySharePath = (property) => {
+  const slug = generatePropSlug(property);
+  return slug ? `/api/share?property=${slug}` : '/';
+};
+
 // --- Lightbox Component ---
 function Lightbox({ isOpen, images, startIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(startIndex || 0);
@@ -1041,7 +1046,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                                 );
                             }
                             return (
-                                <a href={`/?property=${generatePropSlug(p)}`} key={p.id} onClick={(e) => { 
+                                <a href={getPropertySharePath(p)} key={p.id} onClick={(e) => { 
                                     if (!e.ctrlKey && !e.metaKey && !e.button) {
                                         e.preventDefault(); 
                                         if(!isEditMode) onSelectProp(p);
@@ -1335,7 +1340,7 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
               </div>
               <div ref={refToUse} className="flex overflow-x-auto snap-x snap-mandatory gap-3 md:gap-4 pb-4 scrollbar-hide">
                   {relatedProps.map((p) => (
-                      <a href={`/api/share?property=${generatePropSlug(p)}`} key={p.id} onClick={(e) => { if (!e.ctrlKey && !e.metaKey && !e.button) { e.preventDefault(); if(!isEditMode) onSelectProp(p); } }} 
+                      <a href={getPropertySharePath(p)} key={p.id} onClick={(e) => { if (!e.ctrlKey && !e.metaKey && !e.button) { e.preventDefault(); if(!isEditMode) onSelectProp(p); } }} 
                          className={`block bg-white border border-gray-200 hover:border-brand-green hover:shadow-md transition-all duration-200 rounded-lg overflow-hidden flex flex-col w-[220px] md:w-[250px] snap-center flex-shrink-0 ${isEditMode ? 'pointer-events-none cursor-default' : 'cursor-pointer'}`}>
                           <div className="h-[150px] md:h-[160px] w-full relative overflow-hidden bg-gray-100 pointer-events-none flex-shrink-0">
                               <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl, 400)} alt={p.project_name} width={400} height={260} sizes="(max-width: 768px) 220px, 250px" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
@@ -1401,7 +1406,7 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                     <button 
                         onClick={(e) => {
                             e.preventDefault();
-                            const shareUrl = `https://www.startupup-real-estate.com/api/share?property=${generatePropSlug(property)}`;
+                            const shareUrl = `https://www.startupup-real-estate.com${getPropertySharePath(property)}`;
                             navigator.clipboard.writeText(shareUrl);
                             alert('คัดลอกลิงก์สำหรับแชร์เรียบร้อยแล้ว!');
                         }}
@@ -1680,7 +1685,7 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center flex-grow content-start">
         {currentProps.length > 0 ? currentProps.map((p, index) => (
-           <a href={`/?property=${generatePropSlug(p)}`} key={p.id} onClick={(e) => {
+           <a href={getPropertySharePath(p)} key={p.id} onClick={(e) => {
                if (!e.ctrlKey && !e.metaKey && !e.button) {
                    e.preventDefault(); 
                    if(!isEditMode) onSelectProp(p);
@@ -3011,6 +3016,7 @@ export default function App() {
       let targetPath = '/';
 
       if (selectedProperty) {
+          targetPath = '/api/share';
           params.set('property', generatePropSlug(selectedProperty));
       } else {
           if (activeTab !== 'home') params.set('tab', activeTab);
@@ -3019,6 +3025,14 @@ export default function App() {
               params.set('sValue', searchParams.value);
           }
       }
+
+      try {
+          const currentParams = new URLSearchParams(window.location.search);
+          currentParams.forEach((value, key) => {
+              const shouldPreserve = key === '_gl' || key === 'tagassistant' || key.startsWith('gtm_');
+              if (shouldPreserve && !params.has(key)) params.append(key, value);
+          });
+      } catch (e) {}
       
       const queryString = params.toString() ? `?${params.toString()}` : '';
       
