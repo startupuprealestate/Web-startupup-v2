@@ -12,7 +12,8 @@ const contentSecurityPolicy = [
     "'self'",
     "'unsafe-inline'",
     isDevelopment ? "'unsafe-eval'" : "",
-    "https://apis.google.com"
+    "https://apis.google.com",
+    "https://www.googletagmanager.com"
   ].filter(Boolean).join(' '),
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
@@ -29,6 +30,10 @@ const contentSecurityPolicy = [
     "https://*.googleusercontent.com",
     "https://*.googleapis.com",
     "https://*.gstatic.com",
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://*.google-analytics.com",
+    "https://stats.g.doubleclick.net",
     "https://*.basemaps.cartocdn.com",
     "https://placehold.co"
   ].join(' '),
@@ -47,12 +52,17 @@ const contentSecurityPolicy = [
     "https://firebaseinstallations.googleapis.com",
     "https://firestore.googleapis.com",
     "https://www.googleapis.com",
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://*.google-analytics.com",
+    "https://analytics.google.com",
+    "https://stats.g.doubleclick.net",
     "https://*.firebaseio.com",
     "wss://*.firebaseio.com",
     "wss://firestore.googleapis.com"
   ].join(' '),
-  "frame-src 'self' https://www.youtube-nocookie.com https://www.google.com https://maps.google.com https://*.google.com https://accounts.google.com https://*.firebaseapp.com",
-  "child-src 'self' https://www.youtube-nocookie.com https://www.google.com https://maps.google.com https://*.google.com https://accounts.google.com https://*.firebaseapp.com",
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.google.com https://maps.google.com https://*.google.com https://accounts.google.com https://*.firebaseapp.com https://tagassistant.google.com",
+  "child-src 'self' https://www.youtube-nocookie.com https://www.google.com https://maps.google.com https://*.google.com https://accounts.google.com https://*.firebaseapp.com https://tagassistant.google.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "upgrade-insecure-requests"
