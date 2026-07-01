@@ -300,6 +300,15 @@ function SmartImage({
   return <img src={safeSrc} alt={alt} className={className} style={style} fetchPriority={priority ? 'high' : undefined} {...props} />;
 }
 
+function SoldOutRibbon({ size = 'md' }) {
+  const sizeClass = size === 'sm' ? 'sold-out-ribbon-sm' : size === 'lg' ? 'sold-out-ribbon-lg' : '';
+  return (
+    <div className={`sold-out-ribbon ${sizeClass}`} aria-label="Sold out">
+      <span>SOLD OUT</span>
+    </div>
+  );
+}
+
 const validateImage = (file) => {
   if (!file || !file.type) return false;
   if (!file.type.startsWith('image/')) {
@@ -1059,14 +1068,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                                         {/* แสดงป้าย Promotion/New ตามปกติ (ซ่อนป้าย Sold Out เล็กมุมขวา) */}
                                         {p.badge && p.badge !== 'Sold Out' && <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : 'bg-brand-green'}`}>{p.badge}</div>}
                                         
-                                        {/* ป้าย SOLD OUT คาดกลางรูป แบบรูปไม่เบลอ */}
-                                        {p.badge === 'Sold Out' && (
-                                            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10">
-                                                <div className="bg-red-600 text-white font-black text-2xl px-6 py-2 border-4 border-white shadow-xl transform -rotate-12 tracking-widest uppercase">
-                                                    SOLD OUT
-                                                </div>
-                                            </div>
-                                        )}
+                                        {p.badge === 'Sold Out' && <SoldOutRibbon />}
                                     </div>
                                     <div className="p-5 flex flex-col flex-grow pointer-events-none">
                                         <h4 className="font-bold text-gray-800 text-[18px] mb-2 line-clamp-2 leading-snug">{p.project_name}</h4>
@@ -1345,7 +1347,9 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                           <div className="h-[150px] md:h-[160px] w-full relative overflow-hidden bg-gray-100 pointer-events-none flex-shrink-0">
                               <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl, 400)} alt={p.project_name} width={400} height={260} sizes="(max-width: 768px) 220px, 250px" className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
                               <div className="absolute top-2 left-2 bg-white/95 px-2 py-1 rounded text-[10px] font-medium shadow-sm z-10">{p.category}</div>
-                              {p.badge && <div className={`absolute top-2 right-2 px-2 py-1 rounded font-medium text-[10px] shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : p.badge === 'Sold Out' ? 'bg-gray-600' : 'bg-brand-green'}`}>{p.badge}</div>}
+                              {p.badge === 'Sold Out'
+                                  ? <SoldOutRibbon size="sm" />
+                                  : p.badge && <div className={`absolute top-2 right-2 px-2 py-1 rounded font-medium text-[10px] shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : 'bg-brand-green'}`}>{p.badge}</div>}
                           </div>
                           <div className="p-3 flex flex-col flex-grow pointer-events-none">
                               <h4 className="font-semibold text-brand-green text-[14px] md:text-[15px] mb-1 line-clamp-1">{p.project_name}</h4>
@@ -1439,7 +1443,9 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                         <button onClick={(e) => { e.stopPropagation(); selectActiveImage(activeImg === images.length - 1 ? 0 : activeImg + 1); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 text-brand-green p-2 rounded-full hover:bg-white transition shadow-md opacity-0 group-hover:opacity-100 z-20"><ChevronRight /></button>
                     </>
                 )}
-                {property.badge && <div className={`absolute top-4 right-4 px-4 py-1.5 rounded-full font-medium text-xs shadow-lg z-20 text-white ${property.badge === 'Promotion' ? 'bg-red-600' : property.badge === 'New' ? 'bg-blue-600' : property.badge === 'Sold Out' ? 'bg-gray-600' : 'bg-brand-green'}`}>{property.badge}</div>}
+                {property.badge === 'Sold Out'
+                    ? <SoldOutRibbon size="lg" />
+                    : property.badge && <div className={`absolute top-4 right-4 px-4 py-1.5 rounded-full font-medium text-xs shadow-lg z-20 text-white ${property.badge === 'Promotion' ? 'bg-red-600' : property.badge === 'New' ? 'bg-blue-600' : 'bg-brand-green'}`}>{property.badge}</div>}
                 
                 <div className="absolute bottom-4 right-4 bg-black/50 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur z-20">
                     <Maximize size={16} />
@@ -1698,14 +1704,7 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
                                         {/* แสดงป้าย Promotion/New ตามปกติ (ซ่อนป้าย Sold Out เล็กมุมขวา) */}
                                         {p.badge && p.badge !== 'Sold Out' && <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-full font-medium text-xs shadow-sm z-10 text-white ${p.badge === 'Promotion' ? 'bg-red-600' : p.badge === 'New' ? 'bg-blue-600' : 'bg-brand-green'}`}>{p.badge}</div>}
                                         
-                                        {/* ป้าย SOLD OUT คาดกลางรูป แบบรูปไม่เบลอ */}
-                                        {p.badge === 'Sold Out' && (
-                                            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10">
-                                                <div className="bg-red-600 text-white font-black text-2xl px-6 py-2 border-4 border-white shadow-xl transform -rotate-12 tracking-widest uppercase">
-                                                    SOLD OUT
-                                                </div>
-                                            </div>
-                                        )}
+                                        {p.badge === 'Sold Out' && <SoldOutRibbon />}
                                     </div>
                <div className="p-5 flex flex-col flex-grow pointer-events-none">
                    <h4 className="font-bold text-gray-800 text-[18px] mb-2 line-clamp-2 leading-snug">{p.project_name}</h4>
