@@ -2898,6 +2898,7 @@ export default function App() {
     
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('home'); 
+  const [isRouteReady, setIsRouteReady] = useState(false);
   const [searchParams, setSearchParams] = useState({ type: 'all', value: '' }); 
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -2983,6 +2984,7 @@ export default function App() {
               if (sType && sValue) setSearchParams({ type: sType, value: sValue });
               if (propSlug) setRequestedPropSlug(propSlug); else setSelectedProperty(null);
           } catch (e) { console.warn("Cannot read URL parameters in this environment."); }
+          setIsRouteReady(true);
       };
       syncFromUrl();
       window.addEventListener('popstate', syncFromUrl);
@@ -3059,6 +3061,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+      const isHomeView = isRouteReady && activeTab === 'home' && !selectedProperty && !requestedPropSlug;
+
+      if (!isHomeView) {
+          setShowPopupModal(false);
+          return;
+      }
+
       if (popupData.imageUrl && !hasCheckedPopup.current) {
           hasCheckedPopup.current = true;
           if (popupData.isActive) {
@@ -3068,7 +3077,7 @@ export default function App() {
               }
           }
       }
-  }, [popupData]);
+  }, [popupData, isRouteReady, activeTab, selectedProperty, requestedPropSlug]);
 
   const updateVisualContent = useCallback((newContent) => {
       setPastVisual([...pastVisual, visualContent]);
@@ -3618,7 +3627,7 @@ export default function App() {
 
       <div className={`text-gray-800 bg-white min-h-screen flex flex-col font-sans relative ${isVisualEditMode ? 'pb-24 border-4 border-blue-500' : ''}`}>
         
-        {showPopupModal && (
+        {showPopupModal && activeTab === 'home' && !selectedProperty && !requestedPropSlug && (
             <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
                 <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full relative overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
                     <div className="w-full relative flex-1 flex bg-gray-100">
