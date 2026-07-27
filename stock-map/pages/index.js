@@ -345,12 +345,18 @@ export default function StockMapPage() {
                     )}
 
                     {zones.map((zone) => {
-                      const open = openZones[zone.name] || view.zone === zone.name;
+                      const open = !!openZones[zone.name];
                       return (
                         <div key={zone.name} className="border-b border-gray-100">
                           <button
                             onClick={() => {
-                              setOpenZones((prev) => ({ ...prev, [zone.name]: !open }));
+                              // กดซ้ำที่ทำเลที่เปิดอยู่ = ย่อกลับ แล้วถอยแผนที่ไปมุมมองรวม
+                              if (open) {
+                                setOpenZones((prev) => ({ ...prev, [zone.name]: false }));
+                                if (view.zone === zone.name) setView({ zone: null, project: null });
+                                setActiveHouseKey(null);
+                                return;
+                              }
                               handleViewChange({ zone: zone.name, project: null });
                             }}
                             className={`w-full text-left px-3 py-2.5 flex items-center gap-2 transition ${view.zone === zone.name ? 'bg-brand-light' : 'hover:bg-gray-50'}`}
