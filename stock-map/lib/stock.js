@@ -17,7 +17,7 @@ const STATUS_GROUPS = {
 };
 
 export const GROUP_META = {
-  wip: { key: 'wip', label: 'ยังไม่เสร็จ', color: '#b45309', desc: 'อยู่ระหว่างปรับปรุง ยังขายไม่ได้' },
+  wip: { key: 'wip', label: 'ยังไม่เสร็จ', color: '#b45309', desc: 'อยู่ระหว่างปรับปรุง' },
   ready: { key: 'ready', label: 'พร้อมขาย', color: '#0b3d1b', desc: 'บ้านว่าง พร้อมเสนอลูกค้า' },
   hold: { key: 'hold', label: 'ติดลูกค้า', color: '#1d4ed8', desc: 'ประเมิน / ยื่นกู้ / ยื่นซ้อนได้ / รอโอน' },
 };
