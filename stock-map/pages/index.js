@@ -104,7 +104,24 @@ function HouseRow({ house, active, onClick }) {
   );
 }
 
-export default function StockMapPage() {
+const PAGE_TITLE = 'แผนที่สต๊อกบ้าน Startup Up';
+const PAGE_DESC = 'ดูว่าแต่ละทำเลมีกี่โครงการ โครงการมีกี่หลัง และบ้านที่ยังไม่เสร็จอยู่ตรงไหน';
+
+/**
+ * og:image ต้องเป็น URL เต็ม เพราะตัวอ่านพรีวิว (LINE, Facebook, Messenger) ไม่รู้จัก path สั้น
+ *
+ * อ่านโดเมนจาก request ตอนเสิร์ฟ ไม่ใช่ตอน build — เวลาผูกโดเมนใหม่หรือเปิดผ่าน URL อื่น
+ * ลิงก์รูปจะถูกเสมอโดยไม่ต้อง build ใหม่
+ */
+export function getServerSideProps({ req }) {
+  const first = (value) => String(value || '').split(',')[0].trim();
+  const host = first(req.headers['x-forwarded-host']) || first(req.headers.host);
+  const proto = first(req.headers['x-forwarded-proto']) || (host.startsWith('localhost') ? 'http' : 'https');
+
+  return { props: { siteUrl: host ? `${proto}://${host}` : '' } };
+}
+
+export default function StockMapPage({ siteUrl = '' }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -280,21 +297,51 @@ export default function StockMapPage() {
   return (
     <>
       <Head>
-        <title>Startup Up — แผนที่สต๊อกบ้าน</title>
+        <title>{PAGE_TITLE}</title>
         <meta name="robots" content="noindex, nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="description" content={PAGE_DESC} />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Startup Up Real Estate" />
+        <meta property="og:locale" content="th_TH" />
+        <meta property="og:title" content={PAGE_TITLE} />
+        <meta property="og:description" content={PAGE_DESC} />
+        <meta property="og:image" content={`${siteUrl}/og.png`} />
+        <meta property="og:image:secure_url" content={`${siteUrl}/og.png`} />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content={PAGE_TITLE} />
+        {siteUrl && <meta property="og:url" content={siteUrl} />}
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={PAGE_TITLE} />
+        <meta name="twitter:description" content={PAGE_DESC} />
+        <meta name="twitter:image" content={`${siteUrl}/og.png`} />
       </Head>
 
       <div className="min-h-screen bg-[#f7f8f7] text-gray-900">
         <header className="bg-brand-green text-white">
           <div className="max-w-[1500px] mx-auto px-4 py-5 flex flex-wrap items-center gap-4 justify-between">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                <MapPin size={22} /> แผนที่สต๊อกบ้าน Startup Up
-              </h1>
-              <p className="text-white/70 text-[13px] mt-1">
-                ดูอย่างเดียว · ข้อมูลจาก Master Stock (แท็บ Stockบ้าน) เฉพาะบ้านของ Startup Up ที่ยังไม่ขาย
-              </p>
+            <div className="flex items-center gap-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo-white.png"
+                alt="Startup Up Real Estate"
+                width={900}
+                height={526}
+                className="h-11 md:h-14 w-auto flex-none"
+              />
+              <span className="h-10 w-px bg-white/20 hidden sm:block" />
+              <div>
+                <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2">
+                  <MapPin size={20} className="flex-none" /> แผนที่สต๊อกบ้าน
+                </h1>
+                <p className="text-white/70 text-[12px] md:text-[13px] mt-1">
+                  ดูอย่างเดียว · ข้อมูลจาก Master Stock (แท็บ Stockบ้าน) เฉพาะบ้านของ Startup Up ที่ยังไม่ขาย
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               {data && (
