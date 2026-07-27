@@ -5,7 +5,9 @@ import {
   Home, MapPin, Hammer, CheckCircle, Users, RefreshCw, ChevronRight, ChevronDown,
   Search, AlertTriangle, Layers, ArrowLeft, ExternalLink
 } from 'lucide-react';
-import { GROUP_META, GROUP_ORDER } from '../lib/stock';
+import {
+  GROUP_META, GROUP_ORDER, SIZE_BUCKETS, STYLE_LABELS, STYLE_ORDER
+} from '../lib/stock';
 
 const StockMap = dynamic(() => import('../components/StockMap'), {
   ssr: false,
@@ -45,6 +47,38 @@ function StatCard({ icon: Icon, label, value, sub, color, active, onClick }) {
   );
 }
 
+function FilterChip({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`text-[12px] rounded-full px-3 py-1.5 border transition ${
+        active
+          ? 'bg-brand-green text-white border-brand-green'
+          : 'bg-white text-gray-600 border-gray-200 hover:border-brand-green hover:text-brand-green'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// เซลล์ในตารางสรุป — กดแล้วไปตั้งตัวกรอง ช่องที่เป็น 0 กดไม่ได้
+function MatrixCell({ value, active, onClick }) {
+  if (!value) return <td className="px-2 py-1.5 text-center text-gray-200">–</td>;
+  return (
+    <td className="px-1 py-1">
+      <button
+        onClick={onClick}
+        className={`w-full rounded-md px-2 py-1 text-[13px] font-medium transition ${
+          active ? 'bg-brand-green text-white' : 'text-gray-700 hover:bg-brand-light'
+        }`}
+      >
+        {value}
+      </button>
+    </td>
+  );
+}
+
 function HouseRow({ house, active, onClick }) {
   const meta = GROUP_META[house.group];
   return (
@@ -60,6 +94,7 @@ function HouseRow({ house, active, onClick }) {
         <span className="block text-[11px] text-gray-500 truncate">
           {house.rawStatus} · {formatPrice(house.price)}
           {house.style ? ` · ${house.style}` : ''}
+          {house.area ? ` · ${house.area}` : ''}
         </span>
       </span>
       {house.precision !== 'exact' && (
@@ -75,6 +110,8 @@ export default function StockMapPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [groupFilter, setGroupFilter] = useState(null);
+  const [styleFilter, setStyleFilter] = useState(null);
+  const [sizeFilter, setSizeFilter] = useState(null);
   const [search, setSearch] = useState('');
   const [view, setView] = useState({ zone: null, project: null });
   const [activeHouseKey, setActiveHouseKey] = useState(null);
@@ -112,6 +149,8 @@ export default function StockMapPage() {
               || normalize(zone.name).includes(term);
             const houses = project.houses.filter((house) => {
               if (groupFilter && house.group !== groupFilter) return false;
+              if (styleFilter && house.styleCategory !== styleFilter) return false;
+              if (sizeFilter && house.sizeBucket !== sizeFilter) return false;
               if (!term) return true;
               return matchesText || normalize(house.houseNumber).includes(term);
             });
@@ -134,7 +173,7 @@ export default function StockMapPage() {
         };
       })
       .filter(Boolean);
-  }, [data, groupFilter, search]);
+  }, [data, groupFilter, styleFilter, sizeFilter, search]);
 
   const visible = useMemo(() => {
     const totals = GROUP_ORDER.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
@@ -151,6 +190,47 @@ export default function StockMapPage() {
     });
     return { totals, houses, projects, zonesCount: zones.length, approximate };
   }, [zones]);
+
+  // ตารางสรุปอิงสถานะ+คำค้นเท่านั้น ไม่อิงตัวกรองประเภท/ขนาด ไม่งั้นพอกดเซลล์แล้วตารางจะยุบเหลือช่องเดียว
+  const summary = useMemo(() => {
+    if (!data) return null;
+    const term = normalize(search);
+    const houses = [];
+    data.zones.forEach((zone) => zone.projects.forEach((project) => project.houses.forEach((house) => {
+      if (groupFilter && house.group !== groupFilter) return;
+      if (term
+        && !normalize(project.name).includes(term)
+        && !normalize(zone.name).includes(term)
+        && !normalize(house.houseNumber).includes(term)) return;
+      houses.push({ ...house, zoneName: zone.name });
+    })));
+
+    const styles = STYLE_ORDER.filter((key) => houses.some((h) => h.styleCategory === key));
+    const sizes = SIZE_BUCKETS.filter((b) => houses.some((h) => h.sizeBucket === b.key));
+    const zoneNames = [...new Set(houses.map((h) => h.zoneName))];
+
+    const count = (predicate) => houses.filter(predicate).length;
+
+    return {
+      total: houses.length,
+      styles,
+      sizes,
+      noSize: count((h) => !h.sizeBucket),
+      styleTotals: Object.fromEntries(styles.map((s) => [s, count((h) => h.styleCategory === s)])),
+      sizeTotals: Object.fromEntries(sizes.map((b) => [b.key, count((h) => h.sizeBucket === b.key)])),
+      byStyleSize: Object.fromEntries(styles.map((s) => [s, {
+        ...Object.fromEntries(sizes.map((b) => [b.key, count((h) => h.styleCategory === s && h.sizeBucket === b.key)])),
+        none: count((h) => h.styleCategory === s && !h.sizeBucket),
+      }])),
+      zones: zoneNames
+        .map((name) => ({
+          name,
+          total: count((h) => h.zoneName === name),
+          byStyle: Object.fromEntries(styles.map((s) => [s, count((h) => h.zoneName === name && h.styleCategory === s)])),
+        }))
+        .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'th')),
+    };
+  }, [data, groupFilter, search]);
 
   const handleViewChange = useCallback((next) => {
     setView(next);
@@ -263,6 +343,42 @@ export default function StockMapPage() {
                   color="#b45309"
                 />
               </div>
+
+              {summary && (
+                <div className="mt-3 bg-white rounded-2xl border border-gray-200 px-4 py-3 flex flex-wrap items-center gap-x-2 gap-y-2">
+                  <span className="text-[12px] text-gray-400 mr-1">ประเภท</span>
+                  {summary.styles.map((key) => (
+                    <FilterChip
+                      key={key}
+                      active={styleFilter === key}
+                      onClick={() => setStyleFilter(styleFilter === key ? null : key)}
+                    >
+                      {STYLE_LABELS[key]} <b>{summary.styleTotals[key]}</b>
+                    </FilterChip>
+                  ))}
+
+                  <span className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
+                  <span className="text-[12px] text-gray-400 mr-1">ขนาด (ตร.ว.)</span>
+                  {summary.sizes.map((bucket) => (
+                    <FilterChip
+                      key={bucket.key}
+                      active={sizeFilter === bucket.key}
+                      onClick={() => setSizeFilter(sizeFilter === bucket.key ? null : bucket.key)}
+                    >
+                      {bucket.label} <b>{summary.sizeTotals[bucket.key]}</b>
+                    </FilterChip>
+                  ))}
+
+                  {(styleFilter || sizeFilter) && (
+                    <button
+                      onClick={() => { setStyleFilter(null); setSizeFilter(null); }}
+                      className="ml-auto text-[12px] text-gray-500 hover:text-brand-green underline"
+                    >
+                      ล้างตัวกรองประเภท/ขนาด
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="grid lg:grid-cols-3 gap-4 mt-4">
                 <section className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -434,6 +550,118 @@ export default function StockMapPage() {
                   </div>
                 </aside>
               </div>
+
+              {summary && summary.total > 0 && (
+                <div className="grid lg:grid-cols-2 gap-4 mt-4">
+                  <section className="bg-white rounded-2xl border border-gray-200 p-4">
+                    <h2 className="text-[14px] font-semibold text-gray-800">ประเภทบ้าน × ขนาด</h2>
+                    <p className="text-[12px] text-gray-400 mt-0.5">
+                      หน่วยเป็น ตร.ว. · กดที่ตัวเลขเพื่อกรองดูเฉพาะกลุ่มนั้น
+                    </p>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-[12px] border-collapse">
+                        <thead>
+                          <tr className="text-gray-400">
+                            <th className="text-left font-normal py-1 pr-2">ประเภท</th>
+                            {summary.sizes.map((bucket) => (
+                              <th key={bucket.key} className="font-normal px-1 py-1 whitespace-nowrap">{bucket.label}</th>
+                            ))}
+                            {summary.noSize > 0 && <th className="font-normal px-1 py-1">ไม่ระบุ</th>}
+                            <th className="font-normal pl-2 py-1">รวม</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.styles.map((style) => (
+                            <tr key={style} className="border-t border-gray-100">
+                              <th className="text-left font-medium text-gray-700 py-1 pr-2 whitespace-nowrap">
+                                {STYLE_LABELS[style]}
+                              </th>
+                              {summary.sizes.map((bucket) => (
+                                <MatrixCell
+                                  key={bucket.key}
+                                  value={summary.byStyleSize[style][bucket.key]}
+                                  active={styleFilter === style && sizeFilter === bucket.key}
+                                  onClick={() => {
+                                    const same = styleFilter === style && sizeFilter === bucket.key;
+                                    setStyleFilter(same ? null : style);
+                                    setSizeFilter(same ? null : bucket.key);
+                                  }}
+                                />
+                              ))}
+                              {summary.noSize > 0 && (
+                                <td className="px-2 py-1.5 text-center text-gray-400">
+                                  {summary.byStyleSize[style].none || '–'}
+                                </td>
+                              )}
+                              <td className="pl-2 py-1.5 text-right font-bold text-brand-green">
+                                {summary.styleTotals[style]}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="border-t-2 border-gray-200 text-gray-500">
+                            <th className="text-left font-medium py-1.5 pr-2">รวม</th>
+                            {summary.sizes.map((bucket) => (
+                              <td key={bucket.key} className="px-2 py-1.5 text-center font-semibold">
+                                {summary.sizeTotals[bucket.key]}
+                              </td>
+                            ))}
+                            {summary.noSize > 0 && <td className="px-2 py-1.5 text-center">{summary.noSize}</td>}
+                            <td className="pl-2 py-1.5 text-right font-bold text-brand-green">{summary.total}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    {summary.noSize > 0 && (
+                      <p className="text-[11px] text-gray-400 mt-2">
+                        “ไม่ระบุ” คือห้องชุดที่วัดเป็น ตร.ม. จึงไม่จัดเข้าช่วง ตร.ว.
+                      </p>
+                    )}
+                  </section>
+
+                  <section className="bg-white rounded-2xl border border-gray-200 p-4">
+                    <h2 className="text-[14px] font-semibold text-gray-800">ประเภทบ้าน × ทำเล</h2>
+                    <p className="text-[12px] text-gray-400 mt-0.5">
+                      กดที่ตัวเลขเพื่อซูมไปทำเลนั้นพร้อมกรองประเภท
+                    </p>
+                    <div className="mt-3 overflow-x-auto max-h-[420px] overflow-y-auto scrollbar-thin">
+                      <table className="w-full text-[12px] border-collapse">
+                        <thead className="sticky top-0 bg-white z-10">
+                          <tr className="text-gray-400">
+                            <th className="text-left font-normal py-1 pr-2">ทำเล</th>
+                            {summary.styles.map((style) => (
+                              <th key={style} className="font-normal px-1 py-1 whitespace-nowrap">
+                                {STYLE_LABELS[style].replace(' / ', '/')}
+                              </th>
+                            ))}
+                            <th className="font-normal pl-2 py-1">รวม</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.zones.map((zone) => (
+                            <tr key={zone.name} className="border-t border-gray-100">
+                              <th className="text-left font-medium text-gray-700 py-1 pr-2 whitespace-nowrap">
+                                {zone.name}
+                              </th>
+                              {summary.styles.map((style) => (
+                                <MatrixCell
+                                  key={style}
+                                  value={zone.byStyle[style]}
+                                  active={styleFilter === style && view.zone === zone.name}
+                                  onClick={() => {
+                                    setStyleFilter(style);
+                                    handleViewChange({ zone: zone.name, project: null });
+                                  }}
+                                />
+                              ))}
+                              <td className="pl-2 py-1.5 text-right font-bold text-brand-green">{zone.total}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                </div>
+              )}
 
               {unlocated.length > 0 && (
                 <section className="mt-4 bg-white rounded-2xl border border-amber-200 p-4">

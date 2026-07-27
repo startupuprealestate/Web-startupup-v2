@@ -22,7 +22,7 @@ const housePopup = (house) => {
     ['ทำเล', house.zone],
     ['ซอย', house.soi],
     ['รูปแบบ', house.style],
-    ['พื้นที่', house.area ? `${house.area} ตร.ว.` : ''],
+    ['พื้นที่', house.area],
     ['ห้องนอน/ห้องน้ำ', house.bedrooms || house.bathrooms ? `${house.bedrooms || '-'} / ${house.bathrooms || '-'}` : ''],
     ['เริ่มทำ', house.startedAt],
     ['ทำเสร็จเมื่อ', house.finishedAt],

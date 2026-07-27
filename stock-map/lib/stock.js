@@ -24,6 +24,50 @@ export const GROUP_META = {
 
 export const GROUP_ORDER = ['wip', 'ready', 'hold'];
 
+// จัดกลุ่มค่า "รูปแบบ" ในชีตให้เหลือประเภทหลักๆ — ลำดับสำคัญ ใช้ตัวที่ match ก่อน
+export const STYLE_CATEGORIES = [
+  { key: 'twin', label: 'บ้านแฝด', test: (s) => /บ้านแฝด/.test(s) },
+  { key: 'detached', label: 'บ้านเดี่ยว', test: (s) => /บ้านเดี่ยว/.test(s) },
+  { key: 'condo', label: 'ห้องชุด', test: (s) => /ห้องชุด|คอนโด/.test(s) },
+  { key: 'corner', label: 'หลังริม / แปลงมุม', test: (s) => /หลังริม|หลังมุม|แปลงมุม/.test(s) },
+  { key: 'townhouse', label: 'ทาวน์เฮาส์', test: (s) => /ทาวน์เฮาส์/.test(s) },
+];
+
+export const STYLE_ORDER = ['townhouse', 'corner', 'twin', 'detached', 'condo', 'other'];
+
+export const STYLE_LABELS = {
+  ...Object.fromEntries(STYLE_CATEGORIES.map((c) => [c.key, c.label])),
+  other: 'ไม่ระบุรูปแบบ',
+};
+
+export const styleCategoryOf = (style) => {
+  const value = String(style || '');
+  return STYLE_CATEGORIES.find((category) => category.test(value))?.key || 'other';
+};
+
+// ช่วงขนาดที่ทีมขายใช้เรียกกันจริง (ตร.ว.) — ห้องชุดที่วัดเป็น ตร.ม. จะไม่ถูกจัดเข้าช่วงเหล่านี้
+export const SIZE_BUCKETS = [
+  { key: 'under16', label: 'ต่ำกว่า 16', min: 0, max: 15 },
+  { key: '16-18', label: '16–18', min: 16, max: 18 },
+  { key: '19-22', label: '19–22', min: 19, max: 22 },
+  { key: '23-24', label: '23–24', min: 23, max: 24 },
+  { key: '25-29', label: '25–29', min: 25, max: 29 },
+  { key: '30-34', label: '30–34', min: 30, max: 34 },
+  { key: '35-49', label: '35–49', min: 35, max: 49 },
+  { key: '50+', label: '50 ขึ้นไป', min: 50, max: Infinity },
+];
+
+/**
+ * ปัดเศษลงก่อนจัดช่วง — พื้นที่ในชีตมีทศนิยม (18.2, 24.6, 29.7) ถ้าเทียบตรงๆ
+ * กับขอบที่เป็นจำนวนเต็มจะร่วงออกจากทุกช่วง และตรงกับที่ทีมขายเรียกกันจริง
+ * (24.6 ตร.ว. คือบ้าน "24 ตร.ว. นิดๆ")
+ */
+export const sizeBucketOf = (areaWah) => {
+  if (!areaWah || areaWah <= 0) return null;
+  const wah = Math.floor(areaWah);
+  return SIZE_BUCKETS.find((bucket) => wah >= bucket.min && wah <= bucket.max)?.key || null;
+};
+
 const CONSIGNMENT_MARK = 'ฝากขาย';
 const CONSIGNMENT_SHARE = '3%';
 
@@ -41,6 +85,25 @@ export const normalizeKey = (value) => clean(value)
 const toNumber = (value) => {
   const n = Number(clean(value).replace(/,/g, ''));
   return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/**
+ * คอลัมน์ "พื้นที่" เป็น ตร.ว. เปล่าๆ ยกเว้นห้องชุดที่เขียนกำกับว่า ตร.ม.
+ * แยกหน่วยไว้เพื่อไม่ให้ 32 ตร.ม. ไปโผล่ในช่วง "30–34 ตร.ว."
+ */
+const parseArea = (raw) => {
+  const text = clean(raw);
+  if (!text) return { areaText: '', areaWah: null, areaUnit: null };
+
+  const amount = toNumber(text.replace(/[^\d.,]/g, ''));
+  if (!amount) return { areaText: text, areaWah: null, areaUnit: null };
+
+  const isSqm = /ตร\.?\s*ม|ตารางเมตร|sqm|sq\.?m/i.test(text);
+  return {
+    areaText: `${amount} ${isSqm ? 'ตร.ม.' : 'ตร.ว.'}`,
+    areaWah: isSqm ? null : amount,
+    areaUnit: isSqm ? 'sqm' : 'wah',
+  };
 };
 
 const headerIndex = (headerRow) => {
@@ -74,6 +137,8 @@ export async function fetchStockRows() {
         || at(row, 'หมดสัญญา') === CONSIGNMENT_MARK;
 
       const rawStatus = at(row, 'สถานะ');
+      const style = at(row, 'รูปแบบ');
+      const { areaText, areaWah, areaUnit } = parseArea(at(row, 'พื้นที่'));
 
       return {
         rowIndex: i + 2, // เลขแถวจริงในชีต (1-based + header)
@@ -81,10 +146,14 @@ export async function fetchStockRows() {
         houseNumber: at(row, 'บ้านเลขที่'),
         soi: at(row, 'ซอย'),
         zone: at(row, 'ทำเล'),
-        area: at(row, 'พื้นที่'),
+        area: areaText,
+        areaWah,
+        areaUnit,
+        sizeBucket: sizeBucketOf(areaWah),
         bedrooms: at(row, 'ห้องนอน'),
         bathrooms: at(row, 'ห้องน้ำ'),
-        style: at(row, 'รูปแบบ'),
+        style,
+        styleCategory: styleCategoryOf(style),
         price: toNumber(at(row, 'ราคา')),
         rawStatus,
         group: STATUS_GROUPS[rawStatus] || (rawStatus ? 'hold' : 'ready'),
