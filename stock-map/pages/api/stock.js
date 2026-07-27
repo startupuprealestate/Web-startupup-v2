@@ -1,0 +1,116 @@
+import { fetchStockRows, selectOwnedActive, GROUP_ORDER, SHEET_URL } from '../../lib/stock';
+import { fetchFirestoreCoords, resolveMapUrls, locateHouses, spreadOverlapping, average } from '../../lib/geo';
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let cache = { at: 0, payload: null };
+
+const emptyCounts = () => GROUP_ORDER.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
+
+const addCount = (counts, group) => {
+  if (group in counts) counts[group] += 1;
+};
+
+async function buildPayload() {
+  const rows = await fetchStockRows();
+  const owned = selectOwnedActive(rows);
+
+  const [lookupMapUrl, firestore] = await Promise.all([
+    resolveMapUrls(owned.map((row) => row.mapUrl)),
+    fetchFirestoreCoords().catch(() => ({ byHouse: new Map(), byProject: new Map() })),
+  ]);
+
+  const houses = locateHouses(owned, lookupMapUrl, firestore);
+
+  // จัดกลุ่ม ทำเล -> โครงการ -> บ้าน
+  const zoneMap = new Map();
+  houses.forEach((house) => {
+    const zoneName = house.zone || 'ไม่ระบุทำเล';
+    if (!zoneMap.has(zoneName)) zoneMap.set(zoneName, new Map());
+    const projectMap = zoneMap.get(zoneName);
+    const projectName = house.project || 'ไม่ระบุโครงการ';
+    if (!projectMap.has(projectName)) projectMap.set(projectName, []);
+    projectMap.get(projectName).push(house);
+  });
+
+  const zones = [...zoneMap.entries()].map(([zoneName, projectMap]) => {
+    const projects = [...projectMap.entries()].map(([projectName, projectHouses]) => {
+      const coords = average(projectHouses.filter((h) => h.precision === 'exact').map((h) => h.coords))
+        || average(projectHouses.map((h) => h.coords));
+      return { name: projectName, coords, houses: projectHouses };
+    });
+
+    const zoneCoords = average(projects.map((p) => p.coords));
+    return { name: zoneName, coords: zoneCoords, projects };
+  });
+
+  // เติมพิกัดโดยประมาณให้บ้านที่ยังไม่มีพิกัด (ใช้จุดกึ่งกลางโครงการ แล้วค่อยเป็นทำเล)
+  zones.forEach((zone) => {
+    zone.projects.forEach((project) => {
+      project.houses.forEach((house) => {
+        if (house.coords) return;
+        if (project.coords) { house.coords = project.coords; house.precision = 'project'; return; }
+        if (zone.coords) { house.coords = zone.coords; house.precision = 'zone'; }
+      });
+      if (!project.coords) project.coords = zone.coords || null;
+    });
+  });
+
+  spreadOverlapping(houses);
+
+  // สรุปยอดหลังจากพิกัดครบแล้ว
+  zones.forEach((zone) => {
+    zone.projects.forEach((project) => {
+      project.counts = emptyCounts();
+      project.houses.forEach((house) => addCount(project.counts, house.group));
+      project.houseCount = project.houses.length;
+      project.houses.sort((a, b) => a.houseNumber.localeCompare(b.houseNumber, 'th'));
+    });
+    zone.projects.sort((a, b) => b.houseCount - a.houseCount || a.name.localeCompare(b.name, 'th'));
+    zone.counts = emptyCounts();
+    zone.projects.forEach((project) => {
+      GROUP_ORDER.forEach((key) => { zone.counts[key] += project.counts[key]; });
+    });
+    zone.projectCount = zone.projects.length;
+    zone.houseCount = zone.projects.reduce((sum, project) => sum + project.houseCount, 0);
+  });
+
+  zones.sort((a, b) => b.houseCount - a.houseCount || a.name.localeCompare(b.name, 'th'));
+
+  const totals = emptyCounts();
+  houses.forEach((house) => addCount(totals, house.group));
+
+  return {
+    updatedAt: new Date().toISOString(),
+    sheetUrl: SHEET_URL,
+    totals: {
+      ...totals,
+      houses: houses.length,
+      projects: zones.reduce((sum, zone) => sum + zone.projectCount, 0),
+      zones: zones.length,
+      unlocated: houses.filter((house) => !house.coords).length,
+      approximate: houses.filter((house) => house.coords && house.precision !== 'exact').length,
+    },
+    zones,
+  };
+}
+
+export default async function handler(req, res) {
+  const force = req.query.refresh === '1';
+  const isFresh = cache.payload && Date.now() - cache.at < CACHE_TTL_MS;
+
+  try {
+    if (force || !isFresh) {
+      cache = { at: Date.now(), payload: await buildPayload() };
+    }
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=900');
+    res.status(200).json(cache.payload);
+  } catch (error) {
+    if (cache.payload) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ ...cache.payload, stale: true, error: String(error.message || error) });
+      return;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(502).json({ error: String(error.message || error) });
+  }
+}

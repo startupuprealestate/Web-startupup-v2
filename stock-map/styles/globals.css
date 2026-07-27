@@ -1,0 +1,48 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+html, body {
+  font-family: 'Prompt', sans-serif;
+  background-color: #f7f8f7;
+  width: 100%;
+}
+
+.leaflet-container {
+  z-index: 10;
+  font-family: 'Prompt', sans-serif;
+  background: #eef1ef;
+}
+.leaflet-popup-content-wrapper { border-radius: 12px; }
+.leaflet-popup-content { margin: 12px 14px; }
+.leaflet-tooltip { border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+.map-pill {
+  font-family: 'Prompt', sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.25;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 2px solid;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.18);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.map-pill:hover { transform: scale(1.07); }
+.map-pill .dot {
+  width: 8px; height: 8px; border-radius: 999px; flex: none;
+}
+.map-pill.zone   { background: #ffffff; border-color: #0b3d1b; color: #0b3d1b; }
+.map-pill.proj   { background: #ffffff; border-color: #0b3d1b; color: #0b3d1b; }
+.map-pill.ready  { background: #0b3d1b; border-color: #ffffff; color: #ffffff; }
+.map-pill.wip    { background: #b45309; border-color: #ffffff; color: #ffffff; }
+.map-pill.hold   { background: #1d4ed8; border-color: #ffffff; color: #ffffff; }
+.map-pill.approx { border-style: dashed; opacity: 0.85; }
+
+.scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5d1; border-radius: 999px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
