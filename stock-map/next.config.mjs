@@ -4,8 +4,16 @@ import { fileURLToPath } from 'node:url';
 /** @type {import('next').NextConfig} */
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
-// เว็บนี้อยู่ในโฟลเดอร์ย่อยของ repo หลัก — ตรึง root ไว้ที่ตัวเองเพื่อไม่ให้ไปอ่าน node_modules ของโปรเจกต์แม่
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
+// เว็บนี้อยู่ในโฟลเดอร์ย่อยของ repo หลัก เวลา build ในเครื่อง Turbopack จะเดินขึ้นไปอ่าน
+// node_modules ของโปรเจกต์แม่ (อยู่ใน OneDrive) แล้วพัง — เลยตรึง root ไว้ที่ตัวเอง
+//
+// แต่บน Vercel ห้ามตรึง: Root Directory ถูกตั้งเป็น stock-map อยู่แล้ว และการตรึงพาธนี้
+// ทำให้ builder หา .next/routes-manifest-deterministic.json ไม่เจอ (ENOENT) หลัง build เสร็จ
+const rootPinning = process.env.VERCEL
+  ? {}
+  : { turbopack: { root: projectRoot }, outputFileTracingRoot: projectRoot };
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -38,8 +46,7 @@ const contentSecurityPolicy = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  turbopack: { root: projectRoot },
-  outputFileTracingRoot: projectRoot,
+  ...rootPinning,
   async headers() {
     return [
       {
