@@ -6,7 +6,7 @@ import {
   Search, AlertTriangle, Layers, ArrowLeft, ExternalLink
 } from 'lucide-react';
 import {
-  GROUP_META, GROUP_ORDER, SIZE_BUCKETS, STYLE_LABELS, STYLE_ORDER
+  GROUP_META, GROUP_ORDER, SIZE_BUCKETS, STYLE_LABELS, STYLE_ORDER, parseZoneName
 } from '../lib/stock';
 
 const StockMap = dynamic(() => import('../components/StockMap'), {
@@ -222,13 +222,12 @@ export default function StockMapPage() {
         ...Object.fromEntries(sizes.map((b) => [b.key, count((h) => h.styleCategory === s && h.sizeBucket === b.key)])),
         none: count((h) => h.styleCategory === s && !h.sizeBucket),
       }])),
-      zones: zoneNames
-        .map((name) => ({
-          name,
-          total: count((h) => h.zoneName === name),
-          byStyle: Object.fromEntries(styles.map((s) => [s, count((h) => h.zoneName === name && h.styleCategory === s)])),
-        }))
-        .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'th')),
+      // ไม่เรียงใหม่ — zoneNames ไล่ตามลำดับที่ API จัดกลุ่มย่านมาให้แล้ว จะได้ตรงกับรายการด้านข้าง
+      zones: zoneNames.map((name) => ({
+        name,
+        total: count((h) => h.zoneName === name),
+        byStyle: Object.fromEntries(styles.map((s) => [s, count((h) => h.zoneName === name && h.styleCategory === s)])),
+      })),
     };
   }, [data, groupFilter, search]);
 
@@ -247,6 +246,23 @@ export default function StockMapPage() {
       setView({ zone: view.zone, project: null });
     }
   }, [zones, view]);
+
+  // จับทำเลย่านเดียวกันมาไว้เป็นก้อนเดียว (API เรียงมาให้ติดกันแล้ว) ย่านที่มีทำเลเดียวไม่ต้องมีหัวข้อ
+  const zoneGroups = useMemo(() => {
+    const groups = [];
+    zones.forEach((zone) => {
+      const { area, label } = parseZoneName(zone.name);
+      const last = groups[groups.length - 1];
+      const entry = { zone, shortLabel: label };
+      if (last && last.area === area) {
+        last.zones.push(entry);
+        last.total += zone.houseCount;
+      } else {
+        groups.push({ area, zones: [entry], total: zone.houseCount });
+      }
+    });
+    return groups;
+  }, [zones]);
 
   const activeZone = view.zone ? zones.find((zone) => zone.name === view.zone) : null;
   const activeProject = activeZone && view.project
@@ -460,9 +476,21 @@ export default function StockMapPage() {
                       <p className="p-6 text-center text-gray-400 text-[13px]">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</p>
                     )}
 
-                    {zones.map((zone) => {
-                      const open = !!openZones[zone.name];
-                      return (
+                    {zoneGroups.map((group) => (
+                      <div key={group.area}>
+                        {group.zones.length > 1 && (
+                          <div className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur px-3 py-1.5 border-y border-gray-100 flex items-baseline gap-2">
+                            <span className="text-[12px] font-semibold text-gray-600">{group.area}</span>
+                            <span className="text-[11px] text-gray-400">
+                              {group.zones.length} ทำเล · {group.total} หลัง
+                            </span>
+                          </div>
+                        )}
+
+                        {group.zones.map(({ zone, shortLabel }) => {
+                          const open = !!openZones[zone.name];
+                          const rowLabel = group.zones.length > 1 && shortLabel ? shortLabel : zone.name;
+                          return (
                         <div key={zone.name} className="border-b border-gray-100">
                           <button
                             onClick={() => {
@@ -479,7 +507,7 @@ export default function StockMapPage() {
                           >
                             {open ? <ChevronDown size={15} className="text-gray-400 flex-none" /> : <ChevronRight size={15} className="text-gray-400 flex-none" />}
                             <span className="min-w-0 flex-1">
-                              <span className="block text-[14px] font-medium text-gray-800 truncate">{zone.name}</span>
+                              <span className="block text-[14px] font-medium text-gray-800 truncate">{rowLabel}</span>
                               <span className="block text-[11px] text-gray-500">
                                 {zone.projectCount} โครงการ · {zone.houseCount} หลัง
                               </span>
@@ -545,8 +573,10 @@ export default function StockMapPage() {
                             </div>
                           )}
                         </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
                 </aside>
               </div>

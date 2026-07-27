@@ -68,6 +68,47 @@ export const sizeBucketOf = (areaWah) => {
   return SIZE_BUCKETS.find((bucket) => wah >= bucket.min && wah <= bucket.max)?.key || null;
 };
 
+/**
+ * แยกชื่อทำเลเป็น (ย่าน, เลข) เพื่อให้ทำเลย่านเดียวกันอยู่ติดกันและเรียงเลขคลองตามลำดับ
+ *   "คลองหลวง คลอง 3" -> { area: 'คลองหลวง', number: 3, label: 'คลอง 3' }
+ *   "สายไหม 33"       -> { area: 'สายไหม',   number: 33, label: '33' }
+ *   "พยอม"            -> { area: 'พยอม',     number: null, label: '' }
+ */
+export const parseZoneName = (name) => {
+  const text = String(name || '').trim();
+
+  const khlong = text.match(/^(.+?)\s*คลอง\s*(\d+)\s*$/);
+  if (khlong) return { area: khlong[1].trim(), number: Number(khlong[2]), label: `คลอง ${khlong[2]}` };
+
+  const numbered = text.match(/^(.+?)\s+(\d+)\s*$/);
+  if (numbered) return { area: numbered[1].trim(), number: Number(numbered[2]), label: numbered[2] };
+
+  return { area: text, number: null, label: '' };
+};
+
+/** เรียงย่านที่มีบ้านเยอะขึ้นก่อน แล้วในย่านเดียวกันเรียงตามเลขคลองจากน้อยไปมาก */
+export const makeZoneComparator = (areaTotals) => (a, b) => {
+  const pa = parseZoneName(a.name);
+  const pb = parseZoneName(b.name);
+
+  if (pa.area !== pb.area) {
+    const byTotal = (areaTotals[pb.area] || 0) - (areaTotals[pa.area] || 0);
+    if (byTotal) return byTotal;
+    return pa.area.localeCompare(pb.area, 'th');
+  }
+  if (pa.number !== pb.number) {
+    if (pa.number === null) return 1;
+    if (pb.number === null) return -1;
+    return pa.number - pb.number;
+  }
+  return a.name.localeCompare(b.name, 'th');
+};
+
+export const zoneAreaTotals = (zones) => zones.reduce((totals, zone) => {
+  const { area } = parseZoneName(zone.name);
+  return { ...totals, [area]: (totals[area] || 0) + (zone.houseCount || 0) };
+}, {});
+
 const CONSIGNMENT_MARK = 'ฝากขาย';
 const CONSIGNMENT_SHARE = '3%';
 

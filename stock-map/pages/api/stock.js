@@ -1,4 +1,6 @@
-import { fetchStockRows, selectOwnedActive, GROUP_ORDER, SHEET_URL } from '../../lib/stock';
+import {
+  fetchStockRows, selectOwnedActive, GROUP_ORDER, SHEET_URL, makeZoneComparator, zoneAreaTotals
+} from '../../lib/stock';
 import { fetchFirestoreCoords, resolveMapUrls, locateHouses, spreadOverlapping, average } from '../../lib/geo';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -74,7 +76,7 @@ async function buildPayload() {
     zone.houseCount = zone.projects.reduce((sum, project) => sum + project.houseCount, 0);
   });
 
-  zones.sort((a, b) => b.houseCount - a.houseCount || a.name.localeCompare(b.name, 'th'));
+  zones.sort(makeZoneComparator(zoneAreaTotals(zones)));
 
   const totals = emptyCounts();
   houses.forEach((house) => addCount(totals, house.group));
