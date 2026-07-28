@@ -1,5 +1,6 @@
 import geocache from '../data/geocache.json';
 import { normalizeKey } from './stock';
+import { extractCoords, inThailand } from './mapurl.mjs';
 
 const FIRESTORE_PROJECT = 'startup-up-realestate';
 const FIRESTORE_KEY = 'AIzaSyDsEeGxKA90-URCn06F-K3U2dvlISf_2Jo';
@@ -7,45 +8,9 @@ const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIRESTORE
 
 export const MAP_CENTER = [13.99, 100.63];
 
-const inThailand = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng)
-  && lat > 5 && lat < 25 && lng > 90 && lng < 110;
-
 const parseCoord = (value) => {
   const n = parseFloat(String(value ?? '').replace(/,/g, '.').replace(/\s/g, ''));
   return Number.isFinite(n) ? n : NaN;
-};
-
-const COORD_PATTERNS = [
-  /@(-?\d+\.\d+),(-?\d+\.\d+)/,
-  /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
-  /[?&](?:q|ll|daddr|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/,
-  // ลิงก์ย่อบางอันเด้งไปเป็น /maps/search/13.99,+100.54
-  /\/maps\/(?:search|place|dir)\/(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
-];
-
-// บางลิงก์ในชีตเป็น ?q=<%20 เยอะๆ>14.04,<%20 เยอะๆ>100.65 — ต้องถอดรหัสและตัดช่องว่างก่อนถึงจะจับได้
-const decodeCompact = (text) => {
-  try {
-    return decodeURIComponent(text).replace(/\s+/g, '');
-  } catch {
-    return text.replace(/%20/g, '').replace(/\s+/g, '');
-  }
-};
-
-const extractCoords = (text) => {
-  const raw = String(text || '');
-  const candidates = raw.length <= 2000 ? [raw, decodeCompact(raw)] : [raw];
-
-  for (const candidate of candidates) {
-    for (const pattern of COORD_PATTERNS) {
-      const match = candidate.match(pattern);
-      if (!match) continue;
-      const lat = Number(match[1]);
-      const lng = Number(match[2]);
-      if (inThailand(lat, lng)) return [Number(lat.toFixed(6)), Number(lng.toFixed(6))];
-    }
-  }
-  return null;
 };
 
 // ลิงก์ Google Maps ที่ resolve ตอน runtime จะถูกเก็บไว้ในหน่วยความจำของ instance
@@ -167,7 +132,8 @@ export function spreadOverlapping(houses) {
 
   buckets.forEach((group) => {
     if (group.length < 2) return;
-    const radius = 0.00022;
+    // ~9 เมตร พอให้คลิกแยกกันได้ตอนซูมสุด แต่ยังเกาะอยู่กับตำแหน่งจริง
+    const radius = 0.00008;
     group.forEach((house, i) => {
       const angle = (2 * Math.PI * i) / group.length;
       house.coords = [

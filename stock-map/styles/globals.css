@@ -31,6 +31,8 @@ html, body {
   gap: 6px;
   cursor: pointer;
   transition: transform 0.15s;
+  /* ขยายจากวงกลมชี้ตำแหน่ง ไม่ใช่จากกึ่งกลางป้าย หมุดจะได้ไม่ขยับออกจากพิกัดตอน hover */
+  transform-origin: 18px center;
 }
 .map-pill:hover { transform: scale(1.07); }
 .map-pill .dot {

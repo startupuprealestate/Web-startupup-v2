@@ -2,7 +2,8 @@
  * แปลงลิงก์ Google Maps ทุกอันในคอลัมน์ Location ของชีต Stockบ้าน เป็นพิกัด
  * แล้วเขียนทับ data/geocache.json เพื่อให้ /api/stock ไม่ต้องยิง redirect ตอน runtime
  *
- *   node scripts/build-geocache.mjs
+ *   node scripts/build-geocache.mjs           แปลงเฉพาะลิงก์ใหม่ที่ยังไม่มีในแคช
+ *   node scripts/build-geocache.mjs --force   แปลงใหม่ทั้งหมด (ใช้เมื่อแก้วิธีอ่านพิกัดใน lib/mapurl.mjs)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,43 +11,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { parseCSV } = await import(pathToFileURL(path.join(ROOT, 'lib', 'csv.mjs')).href);
+const { extractCoords } = await import(pathToFileURL(path.join(ROOT, 'lib', 'mapurl.mjs')).href);
 const CACHE_PATH = path.join(ROOT, 'data', 'geocache.json');
+const FORCE = process.argv.includes('--force');
 const SHEET_ID = '1fdVOGbCgUCRVI_uYDBDZK7Mz0sajTxu4z6e3xS2JDQ4';
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 const CONCURRENCY = 8;
-
-const COORD_PATTERNS = [
-  /@(-?\d+\.\d+),(-?\d+\.\d+)/,
-  /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
-  /[?&](?:q|ll|daddr|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/,
-  /\/maps\/(?:search|place|dir)\/(-?\d+\.\d+),\+?(-?\d+\.\d+)/,
-];
-
-const decodeCompact = (text) => {
-  try {
-    return decodeURIComponent(text).replace(/\s+/g, '');
-  } catch {
-    return text.replace(/%20/g, '').replace(/\s+/g, '');
-  }
-};
-
-const extractCoords = (text) => {
-  const raw = String(text || '');
-  const candidates = raw.length <= 2000 ? [raw, decodeCompact(raw)] : [raw];
-
-  for (const candidate of candidates) {
-    for (const pattern of COORD_PATTERNS) {
-      const match = candidate.match(pattern);
-      if (!match) continue;
-      const lat = Number(match[1]);
-      const lng = Number(match[2]);
-      if (lat > 5 && lat < 25 && lng > 90 && lng < 110) {
-        return [Number(lat.toFixed(6)), Number(lng.toFixed(6))];
-      }
-    }
-  }
-  return null;
-};
 
 const response = await fetch(CSV_URL, { redirect: 'follow' });
 if (!response.ok) throw new Error(`อ่านชีตไม่สำเร็จ (${response.status})`);
@@ -65,8 +35,8 @@ const links = [...new Set(
 if (!links.length) throw new Error('ไม่พบลิงก์ Google Maps ในคอลัมน์ Location');
 
 const existing = fs.existsSync(CACHE_PATH) ? JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8')) : {};
-const pending = links.filter((url) => !existing[url]);
-console.log(`ลิงก์ทั้งหมด ${links.length} · มีในแคชแล้ว ${links.length - pending.length} · ต้องแปลงใหม่ ${pending.length}`);
+const pending = FORCE ? links : links.filter((url) => !existing[url]);
+console.log(`ลิงก์ทั้งหมด ${links.length} · มีในแคชแล้ว ${links.filter((url) => existing[url]).length} · ต้องแปลง ${pending.length}${FORCE ? ' (--force)' : ''}`);
 
 const resolved = {};
 const failed = [];

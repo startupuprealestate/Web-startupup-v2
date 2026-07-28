@@ -107,12 +107,20 @@ export default function StockMap({ zones, view, onViewChange, activeHouseKey }) 
     layer.clearLayers();
     const bounds = [];
 
+    // ทุกป้ายต้องมีวงกลมเล็กอยู่ซ้ายสุดเป็นตัวชี้ตำแหน่ง แล้ว "วงกลมนั้น" คือจุดที่ทับพิกัดจริง
+    // ถ้าไม่มีวงกลม ตัวป้ายจะลอยอยู่เฉยๆ ดูไม่ออกว่าพิกัดจริงอยู่ตรงไหน
+    // ระยะจากขอบซ้ายป้ายถึงกลางวงกลม = ขอบ 2 + padding 12 + ครึ่งวงกลม 4 = 18px
+    const DOT_CENTER_X = 18;
+    const PILL_CENTER_Y = 14;
+
     const pill = (html, variant, extraClass = '') => L.divIcon({
       className: '',
       html: `<div class="map-pill ${variant} ${extraClass}">${html}</div>`,
       iconSize: null,
-      iconAnchor: [0, 14],
+      iconAnchor: [DOT_CENTER_X, PILL_CENTER_Y],
     });
+
+    const dot = (color) => `<span class="dot" style="background:${color}"></span>`;
 
     const activeZone = view.zone ? zones.find((zone) => zone.name === view.zone) : null;
     const activeProject = activeZone && view.project
@@ -127,7 +135,7 @@ export default function StockMap({ zones, view, onViewChange, activeHouseKey }) 
         const isActive = activeHouseKey === house.rowIndex;
         const marker = L.marker(house.coords, {
           icon: pill(
-            `<span class="dot" style="background:${isActive ? '#fff' : 'rgba(255,255,255,.65)'}"></span>${escapeHtml(house.houseNumber || meta.label)}`,
+            `${dot(isActive ? '#fff' : 'rgba(255,255,255,.65)')}${escapeHtml(house.houseNumber || meta.label)}`,
             house.group,
             house.precision === 'exact' ? '' : 'approx'
           ),
@@ -141,11 +149,11 @@ export default function StockMap({ zones, view, onViewChange, activeHouseKey }) 
         if (!project.coords) return;
         bounds.push(project.coords);
         const marker = L.marker(project.coords, {
-          icon: pill(`${escapeHtml(project.name)} · ${project.houseCount} หลัง`, 'proj'),
+          icon: pill(`${dot('#0b3d1b')}${escapeHtml(project.name)} · ${project.houseCount} หลัง`, 'proj'),
           // โครงการที่มีบ้านเยอะให้อยู่ชั้นบน จะได้ไม่ถูกป้ายเล็กบัง
           zIndexOffset: project.houseCount * 10,
         }).addTo(layer);
-        marker.bindTooltip(countsLabel(project.counts) || 'ไม่มีข้อมูล', { direction: 'top', offset: [40, -6] });
+        marker.bindTooltip(countsLabel(project.counts) || 'ไม่มีข้อมูล', { direction: 'top', offset: [0, -6] });
         marker.on('click', () => onViewChange({ zone: activeZone.name, project: project.name }));
       });
     } else {
@@ -153,12 +161,12 @@ export default function StockMap({ zones, view, onViewChange, activeHouseKey }) 
         if (!zone.coords) return;
         bounds.push(zone.coords);
         const marker = L.marker(zone.coords, {
-          icon: pill(`${zone.projectCount} โครงการ`, 'zone'),
+          icon: pill(`${dot('#0b3d1b')}${zone.projectCount} โครงการ`, 'zone'),
           zIndexOffset: zone.houseCount * 10,
         }).addTo(layer);
         marker.bindTooltip(
           `<b>${escapeHtml(zone.name)}</b><br/>${zone.projectCount} โครงการ · ${zone.houseCount} หลัง<br/>${countsLabel(zone.counts)}`,
-          { direction: 'top', offset: [35, -6] }
+          { direction: 'top', offset: [0, -6] }
         );
         marker.on('click', () => onViewChange({ zone: zone.name, project: null }));
       });
