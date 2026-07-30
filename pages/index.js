@@ -145,6 +145,82 @@ const DISTRICT_COORDS = {
   'บ้านใหม่': [13.957, 100.545], 'บางพูน': [13.978, 100.575], 'บางกะดี': [13.984, 100.548]
 };
 
+/**
+ * พิกัดสำรองของทำเลย่อย แยกตามทำเลหลัก
+ *
+ * ชื่อคลองซ้ำกันหลายอำเภอ (คลองหนึ่งมีทั้งคลองหลวง ธัญบุรี และลำลูกกา) ถ้าอ้างแต่ชื่อคลอง
+ * บ้านที่ยังไม่ได้กรอก lat/lng จะถูกวางหมุดผิดอำเภอ — เช่นคลองหนึ่งคลองหลวงไปโผล่ที่คลองหนึ่งธัญบุรี
+ * ตัวเลขได้จากค่ากลางของบ้านที่มีพิกัดจริงในแต่ละทำเล แล้วไล่ตามแนวคลองสำหรับคลองที่ยังไม่มีบ้าน
+ */
+const AREA_SUB_COORDS = {
+  'คลองหลวง': {
+    'คลองหนึ่ง': [14.075, 100.626], 'คลองสอง': [14.058, 100.642],
+    'คลองสาม': [14.032, 100.666], 'คลองสี่': [14.030, 100.687]
+  },
+  'ธัญบุรี': {
+    'คลองหนึ่ง': [13.977, 100.631], 'คลองสอง': [13.985, 100.653],
+    'คลองสาม': [13.993, 100.675], 'คลองสี่': [14.001, 100.697],
+    'คลองห้า': [14.008, 100.719], 'คลองหก': [14.016, 100.741],
+    'คลองเจ็ด': [14.024, 100.763], 'คลองแปด': [14.032, 100.785],
+    'คลองเก้า': [14.040, 100.807], 'คลองสิบ': [14.047, 100.830],
+    'คลองสิบเอ็ด': [14.055, 100.852]
+  },
+  'ลำลูกกา': {
+    'คลองหนึ่ง': [13.958, 100.634], 'คลองสอง': [13.959, 100.654],
+    'คลองสาม': [13.957, 100.671], 'คลองสี่': [13.967, 100.683],
+    'คลองห้า': [13.955, 100.714], 'คลองหก': [13.951, 100.734],
+    'คลองเจ็ด': [13.955, 100.750], 'คลองแปด': [13.954, 100.775],
+    'คลองเก้า': [13.952, 100.795], 'คลองสิบ': [13.950, 100.815],
+    'คลองสิบเอ็ด': [13.948, 100.835]
+  },
+  'เมืองปทุมธานี': {
+    'บ้านใหม่': [13.957, 100.545], 'บางพูน': [13.986, 100.572], 'บางกะดี': [13.990, 100.542]
+  },
+  'กรุงเทพมหานคร': {
+    'ดอนเมือง': [13.927, 100.568], 'บางเขน': [13.871, 100.600],
+    'พหลโยธิน 48': [13.878, 100.610], 'พหลโยธิน 52': [13.889, 100.628],
+    'สายไหม': [13.924, 100.647]
+  },
+  'นนทบุรี': {
+    'บางบัวทอง': [13.915, 100.418], 'ปากเกร็ด - ติวานนท์': [13.948, 100.543],
+    'ปิ่นเกล้า': [13.762, 100.486], 'บางใหญ่': [13.851, 100.388]
+  },
+  'อยุธยา': { 'พยอม': [14.155, 100.634] },
+  'สมุทรปราการ': { 'บางพลี': [13.562, 100.723] }
+};
+
+const getAreaSubCoords = (area, sub) => ((area && sub && AREA_SUB_COORDS[area]) ? AREA_SUB_COORDS[area][sub] : null) || null;
+
+// ทำเลหลัก: ยึด main_location ก่อน รายการเก่าที่ยังไม่มีค่อยถอยไปดู district/subdistrict
+const matchesMainArea = (p, area) => {
+  if (!area) return false;
+  if (p.main_location) return p.main_location === area;
+  return p.district === area || p.subdistrict === area || (p.subdistrict === 'คูคต' && area === 'ลำลูกกา');
+};
+
+// ทำเลย่อย: ต้องเทียบคู่กับทำเลหลักด้วยเสมอ เพราะชื่อคลองซ้ำกันหลายอำเภอ
+const matchesSubArea = (p, sub) => {
+  if (!sub) return false;
+  return p.sub_location ? p.sub_location === sub : p.subdistrict === sub;
+};
+
+/**
+ * ข้อมูลทำเลมาจาก Firestore (แก้ได้จากโหมดแก้ไขหน้าเว็บ) ถ้ารูปร่างข้อมูลเพี้ยน — ไม่ใช่อาเรย์
+ * หรือมีรายการที่ไม่มี sub_areas — การ .map() จะพังทั้งหน้าจนกลายเป็นจอขาว เลยล้างให้ปลอดภัยก่อนใช้
+ */
+const normalizeLocations = (locations) => {
+  const list = Array.isArray(locations) && locations.length ? locations : DEFAULT_LOCATIONS_DATA;
+  return list
+    .filter(loc => loc && loc.area)
+    .map(loc => ({ ...loc, sub_areas: Array.isArray(loc.sub_areas) ? loc.sub_areas.filter(Boolean) : [] }));
+};
+
+const searchResultHref = (type, value, area) => {
+  const params = new URLSearchParams({ tab: 'search_result', sType: type, sValue: value });
+  if (area) params.set('sArea', area);
+  return `/?${params.toString()}`;
+};
+
 const TRANSIT_LINES = [
     {
         id: 'red-dark',
@@ -609,7 +685,17 @@ const getSafeCoords = (p) => {
       const mainLoc = String(p.main_location || '').trim();
       const dist = String(p.district || '').trim();
 
-      const fallback = DISTRICT_COORDS[subLoc] || DISTRICT_COORDS[subDist] || DISTRICT_COORDS[mainLoc] || DISTRICT_COORDS[dist] || [14.020, 100.650];
+      // ไล่จากละเอียดไปหยาบ: ทำเลหลัก+ย่อย -> ทำเลหลัก -> ชื่อทำเลย่อยเดี่ยวๆ (ของเก่า)
+      // ถ้าไม่รู้จักคู่ทำเลหลัก+ย่อย ให้ลงที่กลางอำเภอดีกว่าไปลงคลองชื่อเดียวกันของอำเภออื่น
+      const fallback = getAreaSubCoords(mainLoc, subLoc)
+          || getAreaSubCoords(mainLoc, subDist)
+          || getAreaSubCoords(dist, subLoc)
+          || getAreaSubCoords(dist, subDist)
+          || DISTRICT_COORDS[mainLoc]
+          || DISTRICT_COORDS[dist]
+          || DISTRICT_COORDS[subLoc]
+          || DISTRICT_COORDS[subDist]
+          || [14.020, 100.650];
       lat = fallback[0] + (Math.random() - 0.5) * 0.005; 
       lng = fallback[1] + (Math.random() - 0.5) * 0.005;
   }
@@ -864,9 +950,9 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
   const [isPaused, setIsPaused] = useState(false);
 
   const availableProps = properties;
-  const locData = visualContent?.locations || DEFAULT_LOCATIONS_DATA;
+  const locData = normalizeLocations(visualContent?.locations);
   const locationCards = locData.map(loc => {
-      const count = availableProps.filter(p => p.main_location === loc.area || (!p.main_location && p.district === loc.area)).length;
+      const count = availableProps.filter(p => matchesMainArea(p, loc.area)).length;
       return { ...loc, count };
   });
   const marqueeItems = isEditMode ? locationCards : [...locationCards, ...locationCards];
@@ -967,7 +1053,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                 {marqueeItems.map((loc, idx) => (
                     <div key={idx} className="relative rounded-[20px] overflow-hidden w-[240px] md:w-[360px] h-[140px] md:h-[220px] flex-shrink-0 shadow-md hover:shadow-xl transition-all">
                         <a 
-                            href={`/?property=&sType=main_location&sValue=${encodeURIComponent(loc.area)}`}
+                            href={searchResultHref('main_location', loc.area)}
                             onClick={(e) => { 
                                 if (!e.ctrlKey && !e.metaKey && !e.button) {
                                     e.preventDefault();
@@ -1033,7 +1119,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                                 <Home size={30} className="text-brand-green" />
                                 <EditableText tag="h3" fieldKey={section.key} content={visualContent} updateContent={updateVisualContent} isEditMode={isEditMode} className="text-2xl font-bold text-brand-green inline-block" />
                         </div>
-                        <a href={`/?property=&sType=category&sValue=${encodeURIComponent(section.searchCat)}`} onClick={(e) => { 
+                        <a href={searchResultHref('category', section.searchCat)} onClick={(e) => {
                             if (!e.ctrlKey && !e.metaKey && !e.button) { 
                                 e.preventDefault(); 
                                 if(!isEditMode && onSearchCategory) onSearchCategory('category', section.searchCat); 
@@ -1130,8 +1216,8 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
 
 // --- LocationSection Component ---
 function LocationSection({ onSelectLocation, visualContent, updateVisualContent, onUpdateLocationImage, isEditMode }) {
-  const locData = visualContent?.locations || DEFAULT_LOCATIONS_DATA;
-  
+  const locData = normalizeLocations(visualContent?.locations);
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-16 reveal-on-scroll">
       <div className="text-center mb-12">
@@ -1141,9 +1227,9 @@ function LocationSection({ onSelectLocation, visualContent, updateVisualContent,
         {locData.map((loc, idx) => (
           <div key={idx} className="group animate-pop" style={{ animationDelay: `${idx * 50}ms` }}>
             <div className="block h-32 sm:h-48 md:h-64 rounded-2xl overflow-hidden relative mb-3 shadow-sm group-hover:shadow-md transition hover:-translate-y-1">
-               <a href={`/?property=&sType=main_location&sValue=${encodeURIComponent(loc.area)}`} onClick={(e) => { 
+               <a href={searchResultHref('main_location', loc.area)} onClick={(e) => {
                    if (!e.ctrlKey && !e.metaKey && !e.button) {
-                       e.preventDefault(); 
+                       e.preventDefault();
                        if (onSelectLocation && !isEditMode) onSelectLocation('main_location', loc.area);
                    }
                }} className={`block w-full h-full ${isEditMode ? 'pointer-events-none cursor-default' : 'cursor-pointer'}`}>
@@ -1164,11 +1250,11 @@ function LocationSection({ onSelectLocation, visualContent, updateVisualContent,
             
             <div className="flex flex-wrap gap-1.5 px-1">
                {loc.sub_areas.map((sub, i) => (
-                   <a href={`/?property=&sType=sub_location&sValue=${encodeURIComponent(sub)}`} key={i} onClick={(e) => { 
+                   <a href={searchResultHref('sub_location', sub, loc.area)} key={i} onClick={(e) => {
                        if (!e.ctrlKey && !e.metaKey && !e.button) {
-                           e.preventDefault(); 
-                           e.stopPropagation(); 
-                           if (onSelectLocation && !isEditMode) onSelectLocation('sub_location', sub); 
+                           e.preventDefault();
+                           e.stopPropagation();
+                           if (onSelectLocation && !isEditMode) onSelectLocation('sub_location', sub, loc.area);
                        }
                    }} className={`text-[10px] md:text-xs border border-gray-200 text-gray-500 px-2 md:px-3 py-1 md:py-1.5 rounded-full font-light transition ${isEditMode ? 'pointer-events-none' : 'hover:border-brand-green hover:text-brand-green hover:-translate-y-0.5'}`}>
                      {sub}
@@ -1595,9 +1681,14 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
   if (searchParams?.type === 'promo') {
       displayProps = properties.filter(p => p.badge === 'Promotion');
       title = visualContent?.navPromo || DEFAULT_VISUAL_CONTENT.navPromo;
-  } else if (searchParams?.type === 'main_location' || searchParams?.type === 'sub_location' || searchParams?.type === 'district') {
-      displayProps = properties.filter(p => p.main_location === searchParams.value || (!p.main_location && p.district === searchParams.value) || p.sub_location === searchParams.value || (!p.sub_location && p.subdistrict === searchParams.value) || (p.subdistrict === 'คูคต' && searchParams.value === 'ลำลูกกา'));
+  } else if (searchParams?.type === 'main_location' || searchParams?.type === 'district') {
+      displayProps = properties.filter(p => matchesMainArea(p, searchParams.value));
       title = `ทำเล: ${searchParams.value}`;
+  } else if (searchParams?.type === 'sub_location') {
+      // ต้องกรองด้วยทำเลหลักที่กดมาด้วย ไม่งั้นคลองหนึ่งของคลองหลวงจะไปโผล่ในคลองหนึ่งของธัญบุรี
+      const area = searchParams.area;
+      displayProps = properties.filter(p => matchesSubArea(p, searchParams.value) && (!area || matchesMainArea(p, area)));
+      title = `ทำเล: ${area ? `${area} - ` : ''}${searchParams.value}`;
   } else if (searchParams?.type === 'category') {
       if (searchParams.value === 'ทาวน์เฮาส์') {
           displayProps = properties.filter(p => p.category?.includes('ทาวน์เฮาส์'));
@@ -2899,7 +2990,7 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('home'); 
   const [isRouteReady, setIsRouteReady] = useState(false);
-  const [searchParams, setSearchParams] = useState({ type: 'all', value: '' }); 
+  const [searchParams, setSearchParams] = useState({ type: 'all', value: '', area: '' });
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -2981,7 +3072,7 @@ export default function App() {
               const sValue = params.get('sValue');
 
               setActiveTab(tab);
-              if (sType && sValue) setSearchParams({ type: sType, value: sValue });
+              if (sType && sValue) setSearchParams({ type: sType, value: sValue, area: params.get('sArea') || '' });
               if (propSlug) setRequestedPropSlug(propSlug); else setSelectedProperty(null);
           } catch (e) { console.warn("Cannot read URL parameters in this environment."); }
           setIsRouteReady(true);
@@ -3024,6 +3115,7 @@ export default function App() {
           if (activeTab === 'search_result' && searchParams.value) {
               params.set('sType', searchParams.type);
               params.set('sValue', searchParams.value);
+              if (searchParams.area) params.set('sArea', searchParams.area);
           }
       }
 
@@ -3260,7 +3352,9 @@ export default function App() {
 
     const mergeLocations = (existingLocations) => {
         // ตรวจสอบและเพิ่ม location ใหม่จาก DEFAULT_LOCATIONS_DATA
-        const merged = [...(existingLocations || [])];
+        const merged = Array.isArray(existingLocations)
+            ? existingLocations.filter(loc => loc && loc.area).map(loc => ({ ...loc }))
+            : [];
         DEFAULT_LOCATIONS_DATA.forEach(defaultLoc => {
             const exists = merged.find(loc => loc.area === defaultLoc.area);
             if (!exists) {
@@ -3270,7 +3364,8 @@ export default function App() {
                 exists.sub_areas = defaultLoc.sub_areas;
             }
         });
-        return merged;
+        // ทำเลที่ไม่ได้อยู่ในค่าเริ่มต้นอาจไม่มี sub_areas ติดมา — เติมให้เป็นอาเรย์เสมอ
+        return merged.map(loc => (Array.isArray(loc.sub_areas) ? loc : { ...loc, sub_areas: [] }));
     };
 
     const applyVisualData = (data) => {
@@ -3439,11 +3534,11 @@ export default function App() {
     }
   };
 
-  const handleFilterSelect = (type, value) => {
-    setSearchParams({ type, value }); setActiveTab('search_result'); setSelectedProperty(null); window.scrollTo(0, 0);
+  const handleFilterSelect = (type, value, area = '') => {
+    setSearchParams({ type, value, area }); setActiveTab('search_result'); setSelectedProperty(null); window.scrollTo(0, 0);
   };
   const handleGlobalSearch = (query) => {
-    setSearchParams({ type: 'keyword', value: query }); setActiveTab('search_result'); setSelectedProperty(null); window.scrollTo(0, 0);
+    setSearchParams({ type: 'keyword', value: query, area: '' }); setActiveTab('search_result'); setSelectedProperty(null); window.scrollTo(0, 0);
   };
   const handleSelectProperty = (p) => {
     setSelectedProperty(p); window.scrollTo(0, 0);

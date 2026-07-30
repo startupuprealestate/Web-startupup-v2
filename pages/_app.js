@@ -1,3 +1,4 @@
+import { Component as ReactComponent } from 'react'
 import 'leaflet/dist/leaflet.css'
 import '../styles/globals.css'
 import Script from 'next/script'
@@ -5,6 +6,48 @@ import Script from 'next/script'
 const GOOGLE_TAG_ID = 'G-989XMRNC6Y'
 const GOOGLE_TAG_MANAGER_ID = 'GTM-N27PQGL2'
 const TIKTOK_PIXEL_ID = 'D929G0BC77U133LMGG50'
+
+/**
+ * ถ้าส่วนใดของหน้าพังตอน render React จะถอดทั้งหน้าออก ผู้ใช้เห็นเป็นจอขาวเปล่าๆ แจ้งปัญหาไม่ได้
+ * ตัวนี้รับ error ไว้ แสดงข้อความพร้อมปุ่มโหลดใหม่ และพิมพ์ error ลง console ไว้ให้ตามต่อ
+ */
+class ErrorBoundary extends ReactComponent {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Unhandled render error:', error, info?.componentStack)
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children
+
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24, textAlign: 'center', fontFamily: "'Prompt', sans-serif", color: '#0b3d1b' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 600 }}>ขออภัย หน้านี้แสดงผลไม่สำเร็จ</h1>
+        <p style={{ color: '#6b7280', fontSize: 14, maxWidth: 420 }}>
+          กดโหลดหน้าใหม่อีกครั้ง ถ้ายังไม่หายรบกวนแจ้งทีมงานพร้อมบอกว่ากดจากหน้าไหน
+        </p>
+        <code style={{ color: '#9ca3af', fontSize: 12, maxWidth: 480, wordBreak: 'break-word' }}>
+          {String(this.state.error?.message || this.state.error)}
+        </code>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          style={{ background: '#0b3d1b', color: '#fff', border: 0, borderRadius: 999, padding: '10px 24px', fontSize: 14, cursor: 'pointer' }}
+        >
+          โหลดหน้าใหม่
+        </button>
+      </div>
+    )
+  }
+}
 
 export default function App({ Component, pageProps }) {
   return (
@@ -43,7 +86,9 @@ export default function App({ Component, pageProps }) {
           }(window, document, 'ttq');
         `}
       </Script>
-      <Component {...pageProps} />
+      <ErrorBoundary>
+        <Component {...pageProps} />
+      </ErrorBoundary>
     </>
   )
 }
