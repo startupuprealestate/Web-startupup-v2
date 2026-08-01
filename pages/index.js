@@ -21,6 +21,7 @@ import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, o
 import Head from 'next/head';
 import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug, matchesPropertySlug } from '../lib/firestorePublic';
 import { buildPageSeo, buildStructuredData, safeJsonLd } from '../lib/seo';
+import { PROPERTY_OWNERS, DEFAULT_PROPERTY_OWNER, getPropertyOwner, selectPublicProperties } from '../lib/propertyOwners';
 
 
 const Facebook = ({ size = 24, className = "" }) => (
@@ -119,8 +120,6 @@ const DEFAULT_VISUAL_CONTENT = {
 };
 
 const CATEGORIES = ['ทาวน์เฮาส์', 'ทาวน์เฮาส์ชั้นเดียว', 'ทาวน์เฮาส์หลังริม', 'บ้านแฝด', 'บ้านเดี่ยว'];
-const PROPERTY_OWNERS = ['Startup Up', 'Naphat', 'เจ๊หมวย', 'ใบชา', 'ฝากขาย'];
-const DEFAULT_PROPERTY_OWNER = PROPERTY_OWNERS[0];
 const BADGES = [
   { value: '', label: '- ปกติ (ขายทั่วไป) -' },
   { value: 'Promotion', label: 'Promotion (โปรโมชั่น)' },
@@ -2193,11 +2192,6 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
         p?.property_owner?.toLowerCase()?.includes(searchTerm.toLowerCase())
     );
 
-    const getPropertyOwner = (prop) => {
-        const owner = String(prop?.property_owner || '').trim();
-        return PROPERTY_OWNERS.includes(owner) ? owner : DEFAULT_PROPERTY_OWNER;
-    };
-
     const groupedProperties = PROPERTY_OWNERS.map(owner => ({
         owner,
         items: filteredProperties.filter(prop => getPropertyOwner(prop) === owner)
@@ -2581,6 +2575,9 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                             <div className="flex items-center gap-2">
                                                 <Briefcase size={16} className="text-brand-green" />
                                                 <h4 className="font-medium text-brand-green">บ้านของ {owner}</h4>
+                                                {owner !== DEFAULT_PROPERTY_OWNER && (
+                                                    <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">ไม่แสดงบนเว็บ</span>
+                                                )}
                                             </div>
                                             <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full">{items.length} รายการ</span>
                                         </div>
@@ -2634,6 +2631,9 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                                 <select className="input-modern" value={formData.property_owner || DEFAULT_PROPERTY_OWNER} onChange={e=>setFormData({...formData, property_owner: e.target.value})}>
                                                     {PROPERTY_OWNERS.map(owner => <option key={owner} value={owner}>{owner}</option>)}
                                                 </select>
+                                                {(formData.property_owner || DEFAULT_PROPERTY_OWNER) !== DEFAULT_PROPERTY_OWNER && (
+                                                    <p className="text-xs text-amber-700 mt-1">บ้านของเจ้าของอื่นจะไม่ขึ้นบนเว็บ (ยังส่งลิงก์ตรงให้ลูกค้าดูได้)</p>
+                                                )}
                                             </div>
                                             <div><label className="label">ประเภท</label><select className="input-modern" value={formData.category} onChange={e=>setFormData({...formData, category: e.target.value})}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
                                             <div><label className="label">ราคา (บาท) <span className="text-red-500">*</span></label><input type="text" inputMode="numeric" required className="input-modern font-medium text-brand-green" value={Number(String(formData.price).replace(/,/g, '') || 0).toLocaleString()} onChange={e=>setFormData({...formData, price: e.target.value.replace(/[^0-9]/g, '')})}/></div>
@@ -2983,6 +2983,8 @@ export default function App() {
   const [userRole, setUserRole] = useState(null); 
   const [userEmail, setUserEmail] = useState('');
   const [properties, setProperties] = useState([]);
+  // หน้าเว็บฝั่งลูกค้าใช้เฉพาะบ้านของ Startup Up — บ้าน Partner ยังอยู่ครบใน properties สำหรับหลังบ้านและลิงก์ตรง
+  const publicProperties = useMemo(() => selectPublicProperties(properties), [properties]);
   const [companyInfo, setCompanyInfo] = useState(DEFAULT_COMPANY_INFO);
   const [authorizedUsers, setAuthorizedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3826,16 +3828,16 @@ export default function App() {
                   <p className="text-gray-400 font-light tracking-wider animate-pulse">กำลังเตรียมข้อมูล...</p>
               </div>
           ) : selectedProperty ? (
-            <SalePage property={selectedProperty} companyInfo={companyInfo} onBack={() => {setSelectedProperty(null); window.scrollTo(0,0);}} properties={properties} onSelectProp={handleSelectProperty} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} openLightbox={openLightbox} />
+            <SalePage property={selectedProperty} companyInfo={companyInfo} onBack={() => {setSelectedProperty(null); window.scrollTo(0,0);}} properties={publicProperties} onSelectProp={handleSelectProperty} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} openLightbox={openLightbox} />
           ) : (
             <>
               {activeTab === 'home' && <HeroSection visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} />}
-              {activeTab === 'home' && <HomeSection properties={properties} loading={loading} onSelectProp={handleSelectProperty} setActiveTab={setActiveTab} onSearchCategory={handleFilterSelect} onSelectLocation={handleFilterSelect} onSearch={handleGlobalSearch} visualContent={visualContent} updateVisualContent={updateVisualContent} onUpdateLocationImage={handleLocationImageUpdate} onRemoveLocationImage={handleRemoveLocationImage} isEditMode={isVisualEditMode} />}
-              {activeTab === 'promo' && <PropertiesList properties={properties} searchParams={{ type: 'promo' }} onSelectProp={handleSelectProperty} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} />}
-              {activeTab === 'search_result' && <PropertiesList properties={properties} searchParams={searchParams} onSelectProp={handleSelectProperty} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} />}
+              {activeTab === 'home' && <HomeSection properties={publicProperties} loading={loading} onSelectProp={handleSelectProperty} setActiveTab={setActiveTab} onSearchCategory={handleFilterSelect} onSelectLocation={handleFilterSelect} onSearch={handleGlobalSearch} visualContent={visualContent} updateVisualContent={updateVisualContent} onUpdateLocationImage={handleLocationImageUpdate} onRemoveLocationImage={handleRemoveLocationImage} isEditMode={isVisualEditMode} />}
+              {activeTab === 'promo' && <PropertiesList properties={publicProperties} searchParams={{ type: 'promo' }} onSelectProp={handleSelectProperty} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} />}
+              {activeTab === 'search_result' && <PropertiesList properties={publicProperties} searchParams={searchParams} onSelectProp={handleSelectProperty} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} />}
               {activeTab === 'location' && <LocationSection onSelectLocation={handleFilterSelect} visualContent={visualContent} updateVisualContent={updateVisualContent} onUpdateLocationImage={handleLocationImageUpdate} isEditMode={isVisualEditMode} />}
               {activeTab === 'calculator' && <div className="py-16 bg-gray-50"><CalculatorSection visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} /></div>}
-              {activeTab === 'portfolio' && <PortfolioSection companyInfo={companyInfo} properties={properties} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} openLightbox={openLightbox} />}
+              {activeTab === 'portfolio' && <PortfolioSection companyInfo={companyInfo} properties={publicProperties} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isVisualEditMode} openLightbox={openLightbox} />}
             </>
           )}
         </div>
