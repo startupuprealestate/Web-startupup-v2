@@ -566,11 +566,17 @@ function HeroSection({ visualContent, updateVisualContent, isEditMode }) {
 
   useEffect(() => {
       if (heroBgs.length <= 1) return;
+      // ตอนแก้ไขหน้าเว็บ ให้หยุดเลื่อนอัตโนมัติ จะได้กดเลือกรูปที่จะลบได้
+      if (isEditMode) return;
       const interval = setInterval(() => {
           setCurrentIndex(prev => (prev + 1) % heroBgs.length);
       }, 5000);
       return () => clearInterval(interval);
-  }, [heroBgs.length]);
+  }, [heroBgs.length, isEditMode]);
+
+  useEffect(() => {
+      if (currentIndex > heroBgs.length - 1) setCurrentIndex(0);
+  }, [heroBgs.length, currentIndex]);
 
   useEffect(() => {
       preloadImagesAround(heroBgs, currentIndex, 1600, 1);
@@ -604,7 +610,7 @@ function HeroSection({ visualContent, updateVisualContent, isEditMode }) {
       }
       const newBgs = heroBgs.filter((_, i) => i !== currentIndex);
       updateVisualContent({ ...visualContent, heroBgs: newBgs });
-      setCurrentIndex(0);
+      setCurrentIndex(Math.min(currentIndex, newBgs.length - 1));
   };
 
   return (
@@ -635,18 +641,18 @@ function HeroSection({ visualContent, updateVisualContent, isEditMode }) {
                   />
               </div>
               
-              {heroBgs.length > 1 && !isEditMode && (
+              {heroBgs.length > 1 && (
                   <>
-                      <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-brand-green p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-md z-20">
+                      <button onClick={prevSlide} className={`absolute left-4 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-brand-green p-3 rounded-full transition-all duration-300 shadow-md z-30 ${isEditMode ? 'opacity-100 bg-white' : 'opacity-0 group-hover:opacity-100'}`}>
                           <ChevronLeft size={24} />
                       </button>
-                      <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-brand-green p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-md z-20">
+                      <button onClick={nextSlide} className={`absolute right-4 top-1/2 -translate-y-1/2 bg-white/50 hover:bg-white text-brand-green p-3 rounded-full transition-all duration-300 shadow-md z-30 ${isEditMode ? 'opacity-100 bg-white' : 'opacity-0 group-hover:opacity-100'}`}>
                           <ChevronRight size={24} />
                       </button>
                       
-                      <div className="absolute bottom-6 flex gap-2 z-20">
+                      <div className="absolute bottom-6 flex items-center gap-2 z-30">
                           {heroBgs.map((_, idx) => (
-                              <button key={idx} onClick={() => setCurrentIndex(idx)} className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${idx === currentIndex ? 'bg-white w-6' : 'bg-white/50 hover:bg-white/80'}`} />
+                              <button key={idx} onClick={() => setCurrentIndex(idx)} className={`rounded-full transition-all duration-300 ${isEditMode ? 'h-3.5' : 'h-2.5'} ${idx === currentIndex ? (isEditMode ? 'bg-white w-7 ring-2 ring-brand-green' : 'bg-white w-6') : `bg-white/50 hover:bg-white/80 ${isEditMode ? 'w-3.5 ring-1 ring-black/20' : 'w-2.5'}`}`} />
                           ))}
                       </div>
                   </>
@@ -659,7 +665,7 @@ function HeroSection({ visualContent, updateVisualContent, isEditMode }) {
                           <input type="file" accept="image/*" className="hidden" onChange={handleAddFile} />
                       </label>
                       <button onClick={handleRemoveCurrent} className="bg-red-600 text-white px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 shadow hover:bg-red-700 transition text-sm">
-                          <Trash2 size={16} /> ลบรูปที่แสดงอยู่
+                          <Trash2 size={16} /> ลบรูปนี้ ({currentIndex + 1}/{heroBgs.length})
                       </button>
                   </div>
               )}
