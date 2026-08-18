@@ -214,6 +214,20 @@ const normalizeLocations = (locations) => {
     .map(loc => ({ ...loc, sub_areas: Array.isArray(loc.sub_areas) ? loc.sub_areas.filter(Boolean) : [] }));
 };
 
+/**
+ * ทำเลที่ไม่ต้องการโชว์ให้ลูกค้าเห็น (การ์ดทำเลหน้าแรกและหน้าทำเล)
+ * ยังเก็บไว้ในข้อมูลเหมือนเดิม หลังบ้านจึงยังเลือกทำเลนี้ให้บ้านที่ลงไว้แล้วได้
+ */
+const HIDDEN_LOCATION_AREAS = ['สามโคก', 'สมุทรปราการ'];
+
+/**
+ * กรองทำเลที่ซ่อนไว้ออกจากการแสดงผล แต่ยังพก srcIdx ซึ่งเป็นตำแหน่งจริงใน
+ * visualContent.locations ติดไปด้วย เพราะปุ่มเปลี่ยน/ลบรูปในโหมดแก้ไขอ้างอิงตำแหน่งนั้น
+ */
+const visibleLocations = (locations) => locations
+    .map((loc, srcIdx) => ({ ...loc, srcIdx }))
+    .filter(loc => !HIDDEN_LOCATION_AREAS.includes(loc.area));
+
 const searchResultHref = (type, value, area) => {
   const params = new URLSearchParams({ tab: 'search_result', sType: type, sValue: value });
   if (area) params.set('sArea', area);
@@ -956,7 +970,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
 
   const availableProps = properties;
   const locData = normalizeLocations(visualContent?.locations);
-  const locationCards = locData.map(loc => {
+  const locationCards = visibleLocations(locData).map(loc => {
       const count = availableProps.filter(p => matchesMainArea(p, loc.area)).length;
       return { ...loc, count };
   });
@@ -1084,10 +1098,10 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
                             <div className="absolute top-2 right-2 flex gap-2 z-50">
                                 <label className="bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg" title="เปลี่ยนรูปภาพ">
                                     <Upload size={16} />
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { if(e.target.files[0]) onUpdateLocationImage(idx, e.target.files[0]) }} />
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { if(e.target.files[0]) onUpdateLocationImage(loc.srcIdx, e.target.files[0]) }} />
                                 </label>
-                                {loc.img !== DEFAULT_LOCATIONS_DATA[idx]?.img && (
-                                    <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemoveLocationImage(idx); }} className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 shadow-lg" title="ลบรูปภาพกลับไปใช้รูปเริ่มต้น">
+                                {loc.img !== DEFAULT_LOCATIONS_DATA.find(d => d.area === loc.area)?.img && (
+                                    <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemoveLocationImage(loc.srcIdx); }} className="bg-red-600 text-white p-2 rounded-full hover:bg-red-700 shadow-lg" title="ลบรูปภาพกลับไปใช้รูปเริ่มต้น">
                                         <Trash2 size={16} />
                                     </button>
                                 )}
@@ -1221,7 +1235,7 @@ function HomeSection({ properties, loading, onSelectProp, setActiveTab, onSelect
 
 // --- LocationSection Component ---
 function LocationSection({ onSelectLocation, visualContent, updateVisualContent, onUpdateLocationImage, isEditMode }) {
-  const locData = normalizeLocations(visualContent?.locations);
+  const locData = visibleLocations(normalizeLocations(visualContent?.locations));
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-16 reveal-on-scroll">
@@ -1247,7 +1261,7 @@ function LocationSection({ onSelectLocation, visualContent, updateVisualContent,
                    <div className="absolute top-2 right-2 flex gap-2 z-50">
                        <label className="bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 shadow-lg" title="เปลี่ยนรูปภาพ">
                            <Upload size={16} />
-                           <input type="file" accept="image/*" className="hidden" onChange={(e) => { if(e.target.files[0]) onUpdateLocationImage(idx, e.target.files[0]) }} />
+                           <input type="file" accept="image/*" className="hidden" onChange={(e) => { if(e.target.files[0]) onUpdateLocationImage(loc.srcIdx, e.target.files[0]) }} />
                        </label>
                    </div>
                )}
@@ -3240,7 +3254,11 @@ export default function App() {
   const handleRemoveLocationImage = (idx) => {
       if (userRole !== 'host') return;
       const newLocations = [...(visualContent.locations || DEFAULT_LOCATIONS_DATA)];
-      newLocations[idx] = { ...newLocations[idx], img: DEFAULT_LOCATIONS_DATA[idx].img }; 
+      const target = newLocations[idx];
+      if (!target) return;
+      const defaultImg = DEFAULT_LOCATIONS_DATA.find(d => d.area === target.area)?.img;
+      if (!defaultImg) return;
+      newLocations[idx] = { ...target, img: defaultImg }; 
       updateVisualContent({ ...visualContent, locations: newLocations });
   };
 
