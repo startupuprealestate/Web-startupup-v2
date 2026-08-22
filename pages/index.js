@@ -2115,6 +2115,8 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     const [stockIndex, setStockIndex] = useState(null);
     const [stockCheckError, setStockCheckError] = useState('');
     const [isStockRefreshing, setIsStockRefreshing] = useState(false);
+    const [alertOnlyOwners, setAlertOnlyOwners] = useState({});
+    const [expandedPendingGroups, setExpandedPendingGroups] = useState({});
     const [showPendingStock, setShowPendingStock] = useState(false);
     const [pendingStockExpanded, setPendingStockExpanded] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -2329,6 +2331,15 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     // ค่าเริ่มต้น: ย่อทุกกลุ่มไว้ก่อน กดเองถึงจะกาง (เก็บ false = กางอยู่)
     const isOwnerCollapsed = (owner) => !searchTerm && collapsedOwners[owner] !== false;
     const toggleOwnerCollapse = (owner) => setCollapsedOwners(prev => ({ ...prev, [owner]: prev[owner] === false }));
+
+    /** กดป้าย "N หลังต้องเช็ค" แล้วกางกลุ่มให้ พร้อมกรองเหลือเฉพาะหลังที่ติดป้ายเตือน */
+    const toggleOwnerAlertsOnly = (owner) => {
+        setCollapsedOwners(prev => ({ ...prev, [owner]: false }));
+        setAlertOnlyOwners(prev => ({ ...prev, [owner]: !prev[owner] }));
+    };
+
+    const isPendingGroupExpanded = (label) => pendingStockExpanded || !!expandedPendingGroups[label];
+    const togglePendingGroup = (label) => setExpandedPendingGroups(prev => ({ ...prev, [label]: !prev[label] }));
     const toggleOwnerExpand = (owner) => setExpandedOwners(prev => ({ ...prev, [owner]: !prev[owner] }));
 
     const copyPropertyUrl = async (prop) => {
@@ -2758,37 +2769,58 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                             </div>
                             <div className="grid grid-cols-1 gap-6">
                                 {groupedProperties.map(({ owner, items }) => {
-                                    const isCollapsed = isOwnerCollapsed(owner);
-                                    const isExpanded = !!searchTerm || !!expandedOwners[owner];
-                                    const visibleItems = isExpanded ? items : items.slice(0, OWNER_PREVIEW_COUNT);
-                                    const hiddenCount = items.length - visibleItems.length;
-                                    const canToggleMore = !searchTerm && items.length > OWNER_PREVIEW_COUNT;
-                                    const alertCount = items.reduce((n, prop) => n + (getStockAlert(prop) ? 1 : 0), 0);
+                                    const alertItems = items.filter((prop) => getStockAlert(prop));
+                                    const alertCount = alertItems.length;
+                                    const alertOnly = alertCount > 0 && !!alertOnlyOwners[owner];
+                                    const isCollapsed = isOwnerCollapsed(owner) && !alertOnly;
+                                    const listItems = alertOnly ? alertItems : items;
+                                    const isExpanded = !!searchTerm || !!expandedOwners[owner] || alertOnly;
+                                    const visibleItems = isExpanded ? listItems : listItems.slice(0, OWNER_PREVIEW_COUNT);
+                                    const hiddenCount = listItems.length - visibleItems.length;
+                                    const canToggleMore = !searchTerm && !alertOnly && items.length > OWNER_PREVIEW_COUNT;
                                     return (
                                     <section key={owner} className="space-y-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleOwnerCollapse(owner)}
-                                            aria-expanded={!isCollapsed}
-                                            className="w-full text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm hover:border-brand-green/40 transition"
-                                        >
-                                            <div className="flex items-center gap-2">
+                                        <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleOwnerCollapse(owner)}
+                                                aria-expanded={!isCollapsed}
+                                                className="flex items-center gap-2 flex-wrap text-left min-w-0 group"
+                                            >
                                                 <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                                                 <Briefcase size={16} className="text-brand-green" />
-                                                <h4 className="font-medium text-brand-green">บ้านของ {owner}</h4>
+                                                <h4 className="font-medium text-brand-green group-hover:underline">บ้านของ {owner}</h4>
                                                 {owner !== DEFAULT_PROPERTY_OWNER && (
                                                     <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">ไม่แสดงบนเว็บ</span>
                                                 )}
+                                            </button>
+
+                                            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
                                                 {alertCount > 0 && (
-                                                    <span className="text-[11px] text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleOwnerAlertsOnly(owner)}
+                                                        title={alertOnly ? 'กลับไปดูทั้งหมด' : 'ดูเฉพาะหลังที่ต้องเช็ค'}
+                                                        className={`text-[11px] px-2 py-0.5 rounded-full border flex items-center gap-1 transition ${alertOnly ? 'text-white bg-red-500 border-red-500' : 'text-red-600 bg-red-50 border-red-100 hover:bg-red-100'}`}
+                                                    >
                                                         <AlertTriangle size={11}/> {alertCount} หลังต้องเช็ค
-                                                    </span>
+                                                    </button>
                                                 )}
+                                                <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full">
+                                                    {items.length} รายการ{isCollapsed ? ' • กดเพื่อแสดง' : ''}
+                                                </span>
                                             </div>
-                                            <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full self-start sm:self-auto">
-                                                {items.length} รายการ{isCollapsed ? ' • กดเพื่อแสดง' : ''}
-                                            </span>
-                                        </button>
+                                        </div>
+
+                                        {alertOnly && (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleOwnerAlertsOnly(owner)}
+                                                className="w-full text-left text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 hover:bg-red-100 transition"
+                                            >
+                                                กำลังแสดงเฉพาะ {alertCount} หลังที่ต้องเช็ค — กดเพื่อกลับไปดูทั้ง {items.length} หลัง
+                                            </button>
+                                        )}
 
                                         {!isCollapsed && (items.length > 0 ? (
                                             <div className="grid grid-cols-1 gap-4">
@@ -2863,7 +2895,8 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                         {showPendingStock && (
                                             <div className="space-y-4">
                                                 {pendingStockGroups.map(({ label, items, readyCount }) => {
-                                                    const visible = pendingStockExpanded ? items : items.slice(0, PENDING_PREVIEW_COUNT);
+                                                    const groupExpanded = isPendingGroupExpanded(label);
+                                                    const visible = groupExpanded ? items : items.slice(0, PENDING_PREVIEW_COUNT);
                                                     return (
                                                         <div key={label} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
                                                             <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-100">
@@ -2884,10 +2917,15 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                                                     </li>
                                                                 ))}
                                                             </ul>
-                                                            {items.length > PENDING_PREVIEW_COUNT && !pendingStockExpanded && (
-                                                                <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50/50 border-t border-gray-50">
-                                                                    และอีก {items.length - PENDING_PREVIEW_COUNT} หลัง
-                                                                </div>
+                                                            {items.length > PENDING_PREVIEW_COUNT && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => togglePendingGroup(label)}
+                                                                    className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-gray-500 bg-gray-50/50 border-t border-gray-100 hover:text-blue-600 hover:bg-blue-50/50 transition"
+                                                                >
+                                                                    {groupExpanded ? 'ย่อรายการ' : `ดูอีก ${items.length - PENDING_PREVIEW_COUNT} หลัง`}
+                                                                    <ChevronDown size={14} className={`transition-transform ${groupExpanded ? 'rotate-180' : ''}`} />
+                                                                </button>
                                                             )}
                                                         </div>
                                                     );
@@ -2896,10 +2934,13 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                                 {pendingStockHouses.length > PENDING_PREVIEW_COUNT && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setPendingStockExpanded((value) => !value)}
+                                                        onClick={() => {
+                                                            setPendingStockExpanded((value) => !value);
+                                                            setExpandedPendingGroups({});
+                                                        }}
                                                         className="w-full flex items-center justify-center gap-1.5 bg-white border border-dashed border-gray-200 text-sm text-gray-500 hover:text-blue-600 hover:border-blue-200 rounded-xl py-3 transition"
                                                     >
-                                                        {pendingStockExpanded ? 'ย่อรายการ' : 'แสดงทั้งหมด'}
+                                                        {pendingStockExpanded ? 'ย่อทุกกลุ่ม' : 'กางทุกกลุ่ม'}
                                                         <ChevronDown size={16} className={`transition-transform ${pendingStockExpanded ? 'rotate-180' : ''}`} />
                                                     </button>
                                                 )}
