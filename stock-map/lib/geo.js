@@ -1,17 +1,12 @@
 import geocache from '../data/geocache.json';
+import websiteCoords from '../data/website-coords.json';
 import { normalizeKey } from './stock';
 import { extractCoords, inThailand } from './mapurl.mjs';
-
-const FIRESTORE_PROJECT = 'startup-up-realestate';
-const FIRESTORE_KEY = 'AIzaSyDsEeGxKA90-URCn06F-K3U2dvlISf_2Jo';
-const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIRESTORE_PROJECT}/databases/(default)/documents/artifacts/${FIRESTORE_PROJECT}/public/data`;
+import { fetchFirestoreCoords } from './firestoreCoords.mjs';
 
 export const MAP_CENTER = [13.99, 100.63];
 
-const parseCoord = (value) => {
-  const n = parseFloat(String(value ?? '').replace(/,/g, '.').replace(/\s/g, ''));
-  return Number.isFinite(n) ? n : NaN;
-};
+const RESOLVE_CONCURRENCY = 6;
 
 // ลิงก์ Google Maps ที่ resolve ตอน runtime จะถูกเก็บไว้ในหน่วยความจำของ instance
 const runtimeCache = new Map();
@@ -19,7 +14,6 @@ const runtimeCache = new Map();
 export async function resolveMapUrls(urls) {
   const pending = urls.filter((url) => url && !geocache[url] && !runtimeCache.has(url));
   const unique = [...new Set(pending)];
-  const CONCURRENCY = 6;
 
   const worker = async (list) => {
     for (const url of list) {
@@ -34,60 +28,39 @@ export async function resolveMapUrls(urls) {
   };
 
   await Promise.all(
-    Array.from({ length: CONCURRENCY }, (_, i) => worker(unique.filter((_, j) => j % CONCURRENCY === i)))
+    Array.from({ length: RESOLVE_CONCURRENCY }, (_, i) => worker(unique.filter((_, j) => j % RESOLVE_CONCURRENCY === i)))
   );
 
   return (url) => geocache[url] || runtimeCache.get(url) || null;
 }
 
-const firestoreValue = (field) => {
-  if (!field || typeof field !== 'object') return undefined;
-  const key = Object.keys(field)[0];
-  if (key === 'arrayValue') return (field.arrayValue.values || []).map(firestoreValue);
-  if (key === 'integerValue' || key === 'doubleValue') return Number(field[key]);
-  return field[key];
-};
+const toCoordMaps = (data) => ({
+  byHouse: new Map(Object.entries(data?.byHouse || {})),
+  byProject: new Map(Object.entries(data?.byProject || {})),
+});
 
-// พิกัดสำรองจากเว็บหลัก (คอลเลกชัน properties) — ใช้เมื่อชีตไม่มีลิงก์ Google Maps
-export async function fetchFirestoreCoords() {
-  const documents = [];
-  let pageToken = '';
+// ถ้ายังไม่มีสแนปช็อต จะยอมอ่าน Firestore สดๆ แต่จำไว้ 6 ชม.
+// เพื่อไม่ให้ instance ที่เพิ่งตื่นยิงอ่านซ้ำๆ จนกินโควตา
+const LIVE_COORDS_TTL_MS = 6 * 60 * 60 * 1000;
+let liveCoords = { at: 0, value: null };
 
-  do {
-    const url = new URL(`${FIRESTORE_BASE}/properties`);
-    url.searchParams.set('key', FIRESTORE_KEY);
-    url.searchParams.set('pageSize', '300');
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
-
-    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error(`Firestore read failed (${response.status})`);
-
-    const payload = await response.json();
-    documents.push(...(payload.documents || []));
-    pageToken = payload.nextPageToken || '';
-  } while (pageToken);
-
-  const byHouse = new Map();
-  const byProject = new Map();
-
-  documents.forEach((document) => {
-    const data = Object.fromEntries(
-      Object.entries(document.fields || {}).map(([key, field]) => [key, firestoreValue(field)])
-    );
-    const lat = parseCoord(data.lat);
-    const lng = parseCoord(data.lng);
-    if (!inThailand(lat, lng)) return;
-
-    const houseKey = normalizeKey(data.house_number);
-    const projectKey = normalizeKey(data.project_name);
-    if (houseKey && !byHouse.has(houseKey)) byHouse.set(houseKey, [lat, lng]);
-    if (projectKey) {
-      if (!byProject.has(projectKey)) byProject.set(projectKey, []);
-      byProject.get(projectKey).push([lat, lng]);
+/**
+ * พิกัดสำรองจากเว็บหลัก — ปกติอ่านจากสแนปช็อต data/website-coords.json ที่สร้างตอน build
+ * (`npm run build:coords`) จะได้ไม่ต้องอ่าน Firestore ทุกครั้งที่แคชของ /api/stock หมดอายุ
+ * ซึ่งเป็นสาเหตุที่โควตาอ่านรายวันหมดเร็ว — อ่านทีนึงนับเป็น document read เท่าจำนวนบ้านทั้งเว็บ
+ */
+export async function loadWebsiteCoords({ live = false } = {}) {
+  if (!live) {
+    const snapshot = toCoordMaps(websiteCoords);
+    if (snapshot.byHouse.size) {
+      return { ...snapshot, source: 'snapshot', builtAt: websiteCoords?.builtAt || '' };
     }
-  });
+    if (liveCoords.value && Date.now() - liveCoords.at < LIVE_COORDS_TTL_MS) return liveCoords.value;
+  }
 
-  return { byHouse, byProject };
+  const value = { ...toCoordMaps(await fetchFirestoreCoords()), source: 'firestore', builtAt: '' };
+  liveCoords = { at: Date.now(), value };
+  return value;
 }
 
 export const average = (points) => {

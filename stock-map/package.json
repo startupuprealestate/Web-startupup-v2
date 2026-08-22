@@ -6,7 +6,9 @@
     "dev": "next dev --webpack -p 3100",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:coords": "node scripts/build-website-coords.mjs",
+    "prebuild": "node scripts/build-website-coords.mjs"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

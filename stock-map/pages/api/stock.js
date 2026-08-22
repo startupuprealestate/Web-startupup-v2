@@ -1,7 +1,7 @@
 import {
   fetchStockRows, selectOwnedActive, GROUP_ORDER, SHEET_URL, makeZoneComparator, zoneAreaTotals
 } from '../../lib/stock';
-import { fetchFirestoreCoords, resolveMapUrls, locateHouses, spreadOverlapping, average } from '../../lib/geo';
+import { loadWebsiteCoords, resolveMapUrls, locateHouses, spreadOverlapping, average } from '../../lib/geo';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let cache = { at: 0, payload: null };
@@ -12,13 +12,14 @@ const addCount = (counts, group) => {
   if (group in counts) counts[group] += 1;
 };
 
-async function buildPayload() {
+async function buildPayload({ liveCoords = false } = {}) {
   const rows = await fetchStockRows();
   const owned = selectOwnedActive(rows);
 
   const [lookupMapUrl, firestore] = await Promise.all([
     resolveMapUrls(owned.map((row) => row.mapUrl)),
-    fetchFirestoreCoords().catch(() => ({ byHouse: new Map(), byProject: new Map() })),
+    loadWebsiteCoords({ live: liveCoords })
+      .catch(() => ({ byHouse: new Map(), byProject: new Map(), source: 'none', builtAt: '' })),
   ]);
 
   const houses = locateHouses(owned, lookupMapUrl, firestore);
@@ -84,6 +85,9 @@ async function buildPayload() {
   return {
     updatedAt: new Date().toISOString(),
     sheetUrl: SHEET_URL,
+    // พิกัดสำรองมาจากไหน: snapshot = ไฟล์ที่ build ไว้ (ไม่กินโควตา Firestore), firestore = อ่านสด
+    coordsSource: firestore.source || 'none',
+    coordsBuiltAt: firestore.builtAt || '',
     totals: {
       ...totals,
       houses: houses.length,
@@ -97,12 +101,14 @@ async function buildPayload() {
 }
 
 export default async function handler(req, res) {
-  const force = req.query.refresh === '1';
+  const force = req.query.refresh === '1' || req.query.refresh === 'live';
+  // refresh=live เท่านั้นที่จะไปอ่านพิกัดจาก Firestore สดๆ (ใช้ตอนเพิ่มบ้านใหม่ในเว็บหลักแล้วยังไม่ได้ deploy)
+  const liveCoords = req.query.refresh === 'live';
   const isFresh = cache.payload && Date.now() - cache.at < CACHE_TTL_MS;
 
   try {
     if (force || !isFresh) {
-      cache = { at: Date.now(), payload: await buildPayload() };
+      cache = { at: Date.now(), payload: await buildPayload({ liveCoords }) };
     }
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=900');
     res.status(200).json(cache.payload);
