@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Home, MapPin, Bed, Bath, Car, Maximize, Phone, MessageCircle, Menu, X, Plus, Trash2, ShieldCheck, CheckCircle, Calculator, Users, FileText, Settings, Edit, Save, Image as ImageIcon, Layout, ChevronLeft, ChevronRight, ChevronDown, Upload, Briefcase, XCircle, Tag, Loader, Video, Check, Calendar, FolderPlus, Map as MapIcon, Search, AlertTriangle, AlertCircle, Star, ClipboardCheck, Type, LayoutTemplate, Compass } from 'lucide-react';
+import { Home, MapPin, Bed, Bath, Car, Maximize, Phone, MessageCircle, Menu, X, Plus, Trash2, ShieldCheck, CheckCircle, Calculator, Users, FileText, Settings, Edit, Save, Image as ImageIcon, Layout, ChevronLeft, ChevronRight, ChevronDown, Upload, Briefcase, XCircle, Tag, Loader, Video, Check, Copy, Calendar, FolderPlus, Map as MapIcon, Search, AlertTriangle, AlertCircle, Star, ClipboardCheck, Type, LayoutTemplate, Compass } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,6 +22,7 @@ import Head from 'next/head';
 import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug, matchesPropertySlug } from '../lib/firestorePublic';
 import { buildPageSeo, buildStructuredData, safeJsonLd } from '../lib/seo';
 import { PROPERTY_OWNERS, DEFAULT_PROPERTY_OWNER, getPropertyOwner, selectPublicProperties } from '../lib/propertyOwners';
+import { normalizeHouseKey } from '../lib/masterStock';
 
 
 const Facebook = ({ size = 24, className = "" }) => (
@@ -50,6 +51,19 @@ const auth = getAuth(app);
 
 const HOST_EMAIL = 'startup.up.real.estate@gmail.com';
 const appId = "startup-up-realestate";
+
+/**
+ * ปั๊มเวลาไว้ที่ site_settings/public_version ทุกครั้งที่หลังบ้านแก้ข้อมูลที่ขึ้นหน้าเว็บ
+ * ให้ /api/public-data รู้ว่าต้องอ่าน Firestore ใหม่ (ดู lib/publicDataCache.js)
+ * — ยิงแบบไม่ต้องรอ ล้มเหลวก็ไม่กระทบการบันทึก เพราะแคชรีเฟรชเองตามเวลาอยู่แล้ว
+ */
+const markPublicDataChanged = () => {
+  setDoc(
+    doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'public_version'),
+    { updatedAt: serverTimestamp() },
+    { merge: true }
+  ).catch((error) => console.warn('Could not bump public data version.', error));
+};
 
 const DEFAULT_COMPANY_INFO = {
   name: 'STARTUP UP',
@@ -2095,6 +2109,11 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [collapsedOwners, setCollapsedOwners] = useState({});
+    const [expandedOwners, setExpandedOwners] = useState({});
+    const [copiedPropId, setCopiedPropId] = useState(null);
+    const [stockIndex, setStockIndex] = useState(null);
+    const [stockCheckError, setStockCheckError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     // Uploading states
@@ -2217,6 +2236,59 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
         items: filteredProperties.filter(prop => getPropertyOwner(prop) === owner)
     }));
 
+    /**
+     * เทียบกับสต๊อกกลาง (Google Sheet) ว่าบ้านหลังนี้ยังอยู่ไหม
+     * เช็คเฉพาะบ้านของ Startup Up — บ้าน Partner ไม่ได้อยู่ในชีตสต๊อกกลางอยู่แล้ว
+     */
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/stock-check')
+            .then((res) => (res.ok ? res.json() : Promise.reject(new Error('เช็คสต๊อกกลางไม่สำเร็จ'))))
+            .then((data) => {
+                if (cancelled) return;
+                if (data?.houses) { setStockIndex(data); setStockCheckError(data.stale ? 'ข้อมูลสต๊อกกลางอาจไม่ใช่ล่าสุด' : ''); }
+                else setStockCheckError('เช็คสต๊อกกลางไม่สำเร็จ');
+            })
+            .catch(() => { if (!cancelled) setStockCheckError('เช็คสต๊อกกลางไม่สำเร็จ'); });
+        return () => { cancelled = true; };
+    }, []);
+
+    const getStockAlert = (prop) => {
+        if (!stockIndex?.houses) return null;
+        if (!stockIndex.coversPartners && getPropertyOwner(prop) !== DEFAULT_PROPERTY_OWNER) return null;
+        const key = normalizeHouseKey(prop?.house_number);
+        if (!key) return null;
+
+        const hit = stockIndex.houses[key];
+        if (!hit) return { type: 'missing', label: 'ไม่มีใน Master Stock แล้ว', title: `ไม่พบบ้านเลขที่ ${prop.house_number} ใน Master Stock ของ All in One — ควรลบออกจากเว็บ` };
+        if (hit.sold && prop?.badge !== 'Sold Out') return { type: 'sold', label: 'Master Stock ขึ้นว่าขายแล้ว', title: `${hit.source}: สถานะ "${hit.status}" — ควรลบออกจากเว็บ หรือติดป้าย Sold Out` };
+        return null;
+    };
+
+    const OWNER_PREVIEW_COUNT = 6;
+    const toggleOwnerCollapse = (owner) => setCollapsedOwners(prev => ({ ...prev, [owner]: !prev[owner] }));
+    const toggleOwnerExpand = (owner) => setExpandedOwners(prev => ({ ...prev, [owner]: !prev[owner] }));
+
+    const copyPropertyUrl = async (prop) => {
+        const url = `https://www.startupup-real-estate.com${getPropertySharePath(prop)}`;
+        let copied = false;
+        try {
+            if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url); copied = true; }
+        } catch { copied = false; }
+        if (!copied) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.focus(); ta.select();
+                copied = document.execCommand('copy');
+                document.body.removeChild(ta);
+            } catch { copied = false; }
+        }
+        if (!copied) { showAlert('คัดลอกไม่สำเร็จ', url, 'warning'); return; }
+        setCopiedPropId(prop.id);
+        setTimeout(() => setCopiedPropId(curr => (curr === prop.id ? null : curr)), 2000);
+    };
+
     const startEdit = (prop) => {
         setEditData(prop); setFormData({ ...initialForm, ...prop, facilitiesList: prop.facilitiesList || [] }); setImagesPreview(prop.images || (prop.imageUrl ? [prop.imageUrl] : []));
         if (prop.zipcode && thaiAddressData.byZipcode[prop.zipcode]) setAddressOptions(thaiAddressData.byZipcode[prop.zipcode]); else setAddressOptions([]);
@@ -2323,6 +2395,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
         setIsSaving(true);
         try {
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'popup'), popupForm);
+            markPublicDataChanged();
             showAlert('สำเร็จ', 'บันทึกตั้งค่าป๊อปอัปเรียบร้อย', 'success');
         } catch (e) {
             showAlert('ผิดพลาด', e.message, 'error');
@@ -2381,6 +2454,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                     createdAt: serverTimestamp()
                 });
             }
+            markPublicDataChanged();
 
             showAlert('สำเร็จ', 'บันทึกข้อมูลเรียบร้อยแล้ว', 'success');
             setIsEditing(false); setEditData(null); setFormData(initialForm); setImagesPreview([]);
@@ -2399,6 +2473,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             setIsSaving(true); 
             try {
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'properties', id));
+                markPublicDataChanged();
             } catch (error) {
                 showAlert('ผิดพลาด', error.message, 'error');
             } finally {
@@ -2413,6 +2488,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
         setIsSaving(true); 
         const { portfolio_years, ...companyDataOnly } = companyForm; 
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), companyDataOnly, { merge: true }); 
+        markPublicDataChanged();
         setIsSaving(false); 
         showAlert('สำเร็จ', 'บันทึกข้อมูลบริษัทเรียบร้อย', 'success'); 
     };
@@ -2428,6 +2504,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
         setNewPortfolioYear(''); 
         
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), { portfolio_years: updatedYears }, { merge: true });
+        markPublicDataChanged();
     };
 
     const handleDeleteYear = (year) => { 
@@ -2436,6 +2513,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             const updatedYears = companyForm.portfolio_years.filter(y => y.year !== year);
             setCompanyForm({ ...companyForm, portfolio_years: updatedYears });
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), { portfolio_years: updatedYears }, { merge: true });
+            markPublicDataChanged();
         });
     };
 
@@ -2448,6 +2526,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             updatedYears[yearIndex].images = updatedYears[yearIndex].images.filter((_, i) => i !== imgIndex); 
             setCompanyForm({ ...companyForm, portfolio_years: updatedYears }); 
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), { portfolio_years: updatedYears }, { merge: true });
+            markPublicDataChanged();
         }
     };
     
@@ -2465,6 +2544,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             updatedYears[yearIndex] = { ...updatedYears[yearIndex], images };
             setCompanyForm({ ...companyForm, portfolio_years: updatedYears });
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), { portfolio_years: updatedYears }, { merge: true });
+            markPublicDataChanged();
         }
     };
 
@@ -2491,6 +2571,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             setCompanyForm({ ...companyForm, portfolio_years: updatedYears });
             
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), { portfolio_years: updatedYears }, { merge: true });
+            markPublicDataChanged();
 
         } catch (error) {
             showAlert('อัปโหลดผิดพลาด', error.message, 'error');
@@ -2504,6 +2585,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
         if (!checkAccess('host')) return;
         setIsSaving(true); 
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'company_info', 'main'), { portfolio_years: companyForm.portfolio_years }, { merge: true }); 
+        markPublicDataChanged();
         setIsSaving(false); 
         showAlert('สำเร็จ', 'บันทึกรูปผลงานทั้งหมดเรียบร้อย', 'success'); 
     };
@@ -2582,30 +2664,68 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                     {panelTab === 'properties' && !isEditing && (
                         <div className="max-w-6xl mx-auto">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                                <h3 className="text-2xl font-light">รายการทรัพย์สิน <span className="text-sm text-gray-500 ml-2">({properties.length} รายการ)</span></h3>
+                                <div>
+                                    <h3 className="text-2xl font-light">รายการทรัพย์สิน <span className="text-sm text-gray-500 ml-2">({properties.length} รายการ)</span></h3>
+                                    {stockCheckError ? (
+                                        <p className="text-xs text-amber-600 mt-1 flex items-center gap-1"><AlertTriangle size={12}/> {stockCheckError}</p>
+                                    ) : stockIndex ? (
+                                        <>
+                                            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 flex-wrap">
+                                                เทียบกับ
+                                                <a href={stockIndex.sheetUrl} target="_blank" rel="noreferrer" className="underline hover:text-brand-green">Master Stock</a>
+                                                ของ All in One ({stockIndex.houseCount} หลัง) แล้ว — หลังที่มีป้าย <AlertTriangle size={11} className="text-red-500"/> คือไม่อยู่ในสต๊อกแล้ว ควรลบออกจากเว็บ
+                                            </p>
+                                            {!stockIndex.coversPartners && (
+                                                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1"><AlertTriangle size={12}/> อ่านชีตได้ไม่ครบ — ข้ามการเช็คบ้าน Partner ไว้ก่อน</p>
+                                            )}
+                                        </>
+                                    ) : null}
+                                </div>
                                 <div className="flex gap-3 w-full sm:w-auto">
                                     <input type="text" placeholder="ค้นหา..." className="input-modern py-2 w-full sm:w-64" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
                                     <button onClick={startNew} className="btn-primary whitespace-nowrap"><Plus size={16}/> เพิ่มใหม่</button>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 gap-6">
-                                {groupedProperties.map(({ owner, items }) => (
+                                {groupedProperties.map(({ owner, items }) => {
+                                    const isCollapsed = !searchTerm && !!collapsedOwners[owner];
+                                    const isExpanded = !!searchTerm || !!expandedOwners[owner];
+                                    const visibleItems = isExpanded ? items : items.slice(0, OWNER_PREVIEW_COUNT);
+                                    const hiddenCount = items.length - visibleItems.length;
+                                    const canToggleMore = !searchTerm && items.length > OWNER_PREVIEW_COUNT;
+                                    const alertCount = items.reduce((n, prop) => n + (getStockAlert(prop) ? 1 : 0), 0);
+                                    return (
                                     <section key={owner} className="space-y-3">
-                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleOwnerCollapse(owner)}
+                                            aria-expanded={!isCollapsed}
+                                            className="w-full text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm hover:border-brand-green/40 transition"
+                                        >
                                             <div className="flex items-center gap-2">
+                                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                                                 <Briefcase size={16} className="text-brand-green" />
                                                 <h4 className="font-medium text-brand-green">บ้านของ {owner}</h4>
                                                 {owner !== DEFAULT_PROPERTY_OWNER && (
                                                     <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">ไม่แสดงบนเว็บ</span>
                                                 )}
+                                                {alertCount > 0 && (
+                                                    <span className="text-[11px] text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                        <AlertTriangle size={11}/> {alertCount} หลังต้องเช็ค
+                                                    </span>
+                                                )}
                                             </div>
-                                            <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full">{items.length} รายการ</span>
-                                        </div>
+                                            <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full self-start sm:self-auto">
+                                                {items.length} รายการ{isCollapsed ? ' • กดเพื่อแสดง' : ''}
+                                            </span>
+                                        </button>
 
-                                        {items.length > 0 ? (
+                                        {!isCollapsed && (items.length > 0 ? (
                                             <div className="grid grid-cols-1 gap-4">
-                                                {items.map(p => (
-                                                    <div key={p.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 items-center">
+                                                {visibleItems.map(p => {
+                                                  const stockAlert = getStockAlert(p);
+                                                  return (
+                                                    <div key={p.id} className={`bg-white p-4 rounded-xl shadow-sm border flex flex-col sm:flex-row gap-4 items-center ${stockAlert ? 'border-red-200 ring-1 ring-red-50' : 'border-gray-100'}`}>
                                                         <div className="w-full sm:w-24 h-40 sm:h-24 rounded-lg overflow-hidden relative bg-gray-100 flex-shrink-0">
                                                             <SmartImage src={getOptimizedImg(p.images?.[0] || p.imageUrl || "https://placehold.co/300x300", 300)} className="w-full h-full object-cover" alt={p.project_name || 'Property image'} width={300} height={300} sizes="96px" loading="lazy" decoding="async" />
                                                         </div>
@@ -2613,19 +2733,43 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                                             <h4 className="font-medium line-clamp-1">{p.project_name}</h4>
                                                             <p className="text-xs text-gray-500 mt-1">{p.category} • {p.subdistrict}</p>
                                                             <p className="font-medium text-brand-green mt-1">{Number(String(p.price).replace(/,/g, '') || 0).toLocaleString()} ฿</p>
+                                                            {stockAlert && (
+                                                                <span
+                                                                    title={stockAlert.title}
+                                                                    className={`mt-2 inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border ${stockAlert.type === 'missing' ? 'text-red-600 bg-red-50 border-red-100' : 'text-amber-700 bg-amber-50 border-amber-100'}`}
+                                                                >
+                                                                    <AlertTriangle size={12}/> {stockAlert.label}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="flex gap-2 w-full sm:w-auto justify-center">
-                                                            <button onClick={() => startEdit(p)} className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-brand-green bg-gray-50 rounded-lg transition"><Edit size={18}/></button>
-                                                            <button onClick={() => handleDeleteProperty(p.id)} className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-red-500 bg-gray-50 rounded-lg transition"><Trash2 size={18}/></button>
+                                                            <button onClick={() => copyPropertyUrl(p)} title="คัดลอกลิงก์บ้านหลังนี้" className={`p-2 w-full sm:w-auto flex justify-center bg-gray-50 rounded-lg transition ${copiedPropId === p.id ? 'text-green-600' : 'text-gray-400 hover:text-brand-green'}`}>
+                                                                {copiedPropId === p.id ? <Check size={18}/> : <Copy size={18}/>}
+                                                            </button>
+                                                            <button onClick={() => startEdit(p)} title="แก้ไข" className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-brand-green bg-gray-50 rounded-lg transition"><Edit size={18}/></button>
+                                                            <button onClick={() => handleDeleteProperty(p.id)} title="ลบ" className="p-2 w-full sm:w-auto flex justify-center text-gray-400 hover:text-red-500 bg-gray-50 rounded-lg transition"><Trash2 size={18}/></button>
                                                         </div>
                                                     </div>
-                                                ))}
+                                                  );
+                                                })}
+
+                                                {canToggleMore && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleOwnerExpand(owner)}
+                                                        className="w-full flex items-center justify-center gap-1.5 bg-white border border-dashed border-gray-200 text-sm text-gray-500 hover:text-brand-green hover:border-brand-green/40 rounded-xl py-3 transition"
+                                                    >
+                                                        {hiddenCount > 0 ? `แสดงเพิ่มเติมอีก ${hiddenCount} รายการ` : 'ย่อรายการ'}
+                                                        <ChevronDown size={16} className={`transition-transform ${hiddenCount > 0 ? '' : 'rotate-180'}`} />
+                                                    </button>
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="bg-white/70 border border-dashed border-gray-200 rounded-xl px-4 py-6 text-center text-sm text-gray-400">ยังไม่มีบ้านในกลุ่มนี้</div>
-                                        )}
+                                        ))}
                                     </section>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -3221,6 +3365,7 @@ export default function App() {
           setIsSavingVisual(true);
           try {
               await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'site_settings', 'visual'), visualContent, { merge: true });
+              markPublicDataChanged();
               
               setIsVisualEditMode(false);
               setPastVisual([]); setFutureVisual([]);
@@ -3446,6 +3591,22 @@ export default function App() {
       };
     };
 
+    /**
+     * ทางหลักของผู้เข้าชมทั่วไป — อ่านผ่าน /api/public-data ที่แคชไว้ฝั่ง server
+     * เพื่อไม่ให้เบราว์เซอร์ทุกคนยิงอ่าน Firestore ทั้งคอลเลกชัน (กินโควตาอ่านรายวันจนหมด)
+     */
+    const loadPublicDataFromApi = async () => {
+      const response = await fetch('/api/public-data');
+      if (!response.ok) throw new Error(`Public data API failed (${response.status})`);
+
+      const data = await response.json();
+      if (!Array.isArray(data?.properties) || data.properties.length === 0) {
+        throw new Error('Public data API returned no properties');
+      }
+
+      return { props: data.properties, company: data.company, visual: data.visual, popup: data.popup };
+    };
+
     const loadPublicDataFromRest = async () => {
       const [props, company, visual, popup] = await Promise.all([
         fetchPublicCollectionRest('properties'),
@@ -3467,6 +3628,15 @@ export default function App() {
     if (!canManageSite) {
       let isCancelled = false;
       const loadPublicData = async () => {
+        try {
+          const publicData = await withTimeout(loadPublicDataFromApi(), 6000, 'Public data API load');
+          if (isCancelled) return;
+          applyPublicData(publicData);
+          return;
+        } catch (error) {
+          console.warn('Public data API load failed, falling back to Firestore.', error);
+        }
+
         let sdkData = null;
         try {
           sdkData = await withTimeout(loadPublicDataFromSdk(), 6000, 'Public data SDK load');
