@@ -22,7 +22,7 @@ import Head from 'next/head';
 import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug, matchesPropertySlug } from '../lib/firestorePublic';
 import { buildPageSeo, buildStructuredData, safeJsonLd } from '../lib/seo';
 import { PROPERTY_OWNERS, DEFAULT_PROPERTY_OWNER, getPropertyOwner, selectPublicProperties } from '../lib/propertyOwners';
-import { normalizeHouseKey } from '../lib/masterStock';
+import { normalizeHouseKey, houseAliasKey } from '../lib/masterStock';
 
 
 const Facebook = ({ size = 24, className = "" }) => (
@@ -2114,6 +2114,8 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     const [copiedPropId, setCopiedPropId] = useState(null);
     const [stockIndex, setStockIndex] = useState(null);
     const [stockCheckError, setStockCheckError] = useState('');
+    const [showPendingStock, setShowPendingStock] = useState(false);
+    const [pendingStockExpanded, setPendingStockExpanded] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     // Uploading states
@@ -2259,14 +2261,68 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
         const key = normalizeHouseKey(prop?.house_number);
         if (!key) return null;
 
-        const hit = stockIndex.houses[key];
+        // บางหลังในเว็บกรอกบ้านเลขที่ไม่ครบ (เว็บ "904" ชีต "11/904") ลองจับคู่ด้วยโครงการ+เลขท้าย
+        const aliasKey = houseAliasKey(prop?.project_name, key);
+        const hit = stockIndex.houses[key]
+            || (aliasKey && stockIndex.aliases?.[aliasKey] ? stockIndex.houses[stockIndex.aliases[aliasKey]] : null);
         if (!hit) return { type: 'missing', label: 'ไม่มีใน Master Stock แล้ว', title: `ไม่พบบ้านเลขที่ ${prop.house_number} ใน Master Stock ของ All in One — ควรลบออกจากเว็บ` };
         if (hit.sold && prop?.badge !== 'Sold Out') return { type: 'sold', label: 'Master Stock ขึ้นว่าขายแล้ว', title: `${hit.source}: สถานะ "${hit.status}" — ควรลบออกจากเว็บ หรือติดป้าย Sold Out` };
         return null;
     };
 
+    const PENDING_PREVIEW_COUNT = 8;
+
+    /**
+     * บ้านที่ยังอยู่ในสต๊อกกลางแต่ยังไม่มีในเว็บ — เอาไว้เตือนว่ายังต้องไปลงประกาศ
+     * เทียบด้วยบ้านเลขที่ และเผื่อกรณีกรอกเลขไม่ครบด้วยโครงการ+เลขท้าย
+     */
+    const pendingStockHouses = useMemo(() => {
+        const rows = stockIndex?.pending;
+        if (!Array.isArray(rows) || !rows.length) return [];
+
+        const webKeys = new Set();
+        const webAliases = new Set();
+        properties.forEach((prop) => {
+            const key = normalizeHouseKey(prop?.house_number);
+            if (!key) return;
+            webKeys.add(key);
+            const alias = houseAliasKey(prop?.project_name, key);
+            if (alias) webAliases.add(alias);
+        });
+
+        return rows.filter((row) => {
+            if (webKeys.has(row.key)) return false;
+            const alias = houseAliasKey(row.project, row.key);
+            return !(alias && webAliases.has(alias));
+        });
+    }, [stockIndex, properties]);
+
+    // จัดกลุ่มตามชีตต้นทาง แล้วดันหลังที่พร้อมขายขึ้นก่อน (บ้านที่ยังไม่เสร็จยังไม่ต้องรีบลง)
+    const pendingStockGroups = useMemo(() => {
+        const rank = (status) => {
+            const text = String(status || '');
+            if (/ยังไม่เสร็จ/.test(text)) return 2;
+            if (/ว่าง/.test(text)) return 0;
+            return 1;
+        };
+        const groups = new Map();
+        pendingStockHouses.forEach((row) => {
+            const label = row.owner || row.source;
+            if (!groups.has(label)) groups.set(label, []);
+            groups.get(label).push(row);
+        });
+        return [...groups.entries()].map(([label, items]) => ({
+            label,
+            items: [...items].sort((a, b) => rank(a.status) - rank(b.status)
+                || String(a.project).localeCompare(String(b.project), 'th')),
+            readyCount: items.filter((row) => rank(row.status) === 0).length,
+        }));
+    }, [pendingStockHouses]);
+
     const OWNER_PREVIEW_COUNT = 6;
-    const toggleOwnerCollapse = (owner) => setCollapsedOwners(prev => ({ ...prev, [owner]: !prev[owner] }));
+    // ค่าเริ่มต้น: ย่อทุกกลุ่มไว้ก่อน กดเองถึงจะกาง (เก็บ false = กางอยู่)
+    const isOwnerCollapsed = (owner) => !searchTerm && collapsedOwners[owner] !== false;
+    const toggleOwnerCollapse = (owner) => setCollapsedOwners(prev => ({ ...prev, [owner]: prev[owner] === false }));
     const toggleOwnerExpand = (owner) => setExpandedOwners(prev => ({ ...prev, [owner]: !prev[owner] }));
 
     const copyPropertyUrl = async (prop) => {
@@ -2688,7 +2744,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                             </div>
                             <div className="grid grid-cols-1 gap-6">
                                 {groupedProperties.map(({ owner, items }) => {
-                                    const isCollapsed = !searchTerm && !!collapsedOwners[owner];
+                                    const isCollapsed = isOwnerCollapsed(owner);
                                     const isExpanded = !!searchTerm || !!expandedOwners[owner];
                                     const visibleItems = isExpanded ? items : items.slice(0, OWNER_PREVIEW_COUNT);
                                     const hiddenCount = items.length - visibleItems.length;
@@ -2770,6 +2826,73 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                     </section>
                                     );
                                 })}
+
+                                {pendingStockHouses.length > 0 && (
+                                    <section className="space-y-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPendingStock((value) => !value)}
+                                            aria-expanded={showPendingStock}
+                                            className="w-full text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-blue-100 rounded-xl px-4 py-3 shadow-sm hover:border-blue-300 transition"
+                                        >
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <ChevronDown size={16} className={`text-gray-400 transition-transform ${showPendingStock ? '' : '-rotate-90'}`} />
+                                                <FolderPlus size={16} className="text-blue-600" />
+                                                <h4 className="font-medium text-blue-700">ยังไม่ได้ลงเว็บ</h4>
+                                                <span className="text-[11px] text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">อยู่ใน Master Stock แต่ยังไม่มีในเว็บ</span>
+                                            </div>
+                                            <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full self-start sm:self-auto">
+                                                {pendingStockHouses.length} หลัง{showPendingStock ? '' : ' • กดเพื่อแสดง'}
+                                            </span>
+                                        </button>
+
+                                        {showPendingStock && (
+                                            <div className="space-y-4">
+                                                {pendingStockGroups.map(({ label, items, readyCount }) => {
+                                                    const visible = pendingStockExpanded ? items : items.slice(0, PENDING_PREVIEW_COUNT);
+                                                    return (
+                                                        <div key={label} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                                                            <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                                                                <span className="text-sm font-medium text-gray-700">{label}</span>
+                                                                <span className="text-xs text-gray-500">
+                                                                    {items.length} หลัง{readyCount > 0 ? ` • พร้อมขาย ${readyCount}` : ''}
+                                                                </span>
+                                                            </div>
+                                                            <ul className="divide-y divide-gray-50">
+                                                                {visible.map((row) => (
+                                                                    <li key={`${row.source}-${row.key}-${row.project}`} className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-sm">
+                                                                        <span className="font-medium text-gray-700 flex-1 min-w-0 truncate">{row.project || 'ไม่ระบุโครงการ'}</span>
+                                                                        <span className="text-gray-500 sm:w-32">{row.houseNumber}</span>
+                                                                        <span className={`text-[11px] px-2 py-0.5 rounded-full border self-start ${/ยังไม่เสร็จ/.test(row.status) ? 'text-amber-700 bg-amber-50 border-amber-100' : 'text-brand-green bg-brand-light border-green-100'}`}>
+                                                                            {row.status || 'ไม่ระบุสถานะ'}
+                                                                        </span>
+                                                                        <span className="text-gray-400 text-xs sm:w-40 sm:text-right">{[row.zone, row.price].filter(Boolean).join(' • ')}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                            {items.length > PENDING_PREVIEW_COUNT && !pendingStockExpanded && (
+                                                                <div className="px-4 py-2 text-xs text-gray-400 bg-gray-50/50 border-t border-gray-50">
+                                                                    และอีก {items.length - PENDING_PREVIEW_COUNT} หลัง
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {pendingStockHouses.length > PENDING_PREVIEW_COUNT && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPendingStockExpanded((value) => !value)}
+                                                        className="w-full flex items-center justify-center gap-1.5 bg-white border border-dashed border-gray-200 text-sm text-gray-500 hover:text-blue-600 hover:border-blue-200 rounded-xl py-3 transition"
+                                                    >
+                                                        {pendingStockExpanded ? 'ย่อรายการ' : 'แสดงทั้งหมด'}
+                                                        <ChevronDown size={16} className={`transition-transform ${pendingStockExpanded ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
                             </div>
                         </div>
                     )}
