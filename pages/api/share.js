@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, getDoc, query, where, limit } from 'firebase/firestore';
-import { decodeRepeatedly, fetchPublicCollectionRest, matchesPropertySlug } from '../../lib/firestorePublic';
+import { decodeRepeatedly, matchesPropertySlug } from '../../lib/firestorePublic';
+import { getPublicProperties } from '../../lib/publicDataCache';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDsEeGxKA90-URCn06F-K3U2dvlISf_2Jo",
@@ -83,9 +84,7 @@ const findPropertyBySlug = async (propertySlug) => {
       }
     }
 
-    const snapshot = await getDocs(propsRef);
-    const properties = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    return properties.find((item) => matchesPropertySlug(item, propertySlug));
+    return null;
   };
 
   try {
@@ -95,7 +94,9 @@ const findPropertyBySlug = async (propertySlug) => {
     console.warn('Firestore SDK share lookup failed, trying REST fallback.', error);
   }
 
-  const properties = await fetchPublicCollectionRest('properties');
+  // ตกมาถึงตรงนี้แปลว่า query ตรงๆ ไม่เจอ — ใช้ลิสต์ที่แคชไว้ฝั่ง server
+  // (เดิมสแกนทั้งคอลเลกชันใหม่ทุกครั้ง = อ่านหลายร้อยครั้งต่อบอท 1 ตัวที่มาขอ preview)
+  const properties = await getPublicProperties();
   return properties.find((item) => matchesPropertySlug(item, propertySlug));
 };
 
