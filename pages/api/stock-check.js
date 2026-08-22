@@ -1,6 +1,7 @@
 import { fetchMasterStockIndex } from '../../lib/masterStock';
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+// อ่าน Google Sheet ไม่กินโควตาอะไร แคชสั้นๆ พอกันการยิงซ้ำถี่ๆ จะได้เห็นสต๊อกเกือบสด
+const CACHE_TTL_MS = 60 * 1000;
 let cache = { at: 0, payload: null };
 
 export default async function handler(req, res) {
@@ -11,7 +12,7 @@ export default async function handler(req, res) {
     if (force || !isFresh) {
       cache = { at: Date.now(), payload: { ...(await fetchMasterStockIndex()), updatedAt: new Date().toISOString() } };
     }
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Cache-Control', 'private, max-age=30');
     res.status(200).json(cache.payload);
   } catch (error) {
     // มีข้อมูลเก่าอยู่ก็ส่งไปก่อน ดีกว่าให้หลังบ้านไม่เห็นสถานะอะไรเลย

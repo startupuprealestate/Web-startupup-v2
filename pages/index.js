@@ -2114,6 +2114,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
     const [copiedPropId, setCopiedPropId] = useState(null);
     const [stockIndex, setStockIndex] = useState(null);
     const [stockCheckError, setStockCheckError] = useState('');
+    const [isStockRefreshing, setIsStockRefreshing] = useState(false);
     const [showPendingStock, setShowPendingStock] = useState(false);
     const [pendingStockExpanded, setPendingStockExpanded] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -2242,18 +2243,23 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
      * เทียบกับสต๊อกกลาง (Google Sheet) ว่าบ้านหลังนี้ยังอยู่ไหม
      * เช็คเฉพาะบ้านของ Startup Up — บ้าน Partner ไม่ได้อยู่ในชีตสต๊อกกลางอยู่แล้ว
      */
-    useEffect(() => {
-        let cancelled = false;
-        fetch('/api/stock-check')
-            .then((res) => (res.ok ? res.json() : Promise.reject(new Error('เช็คสต๊อกกลางไม่สำเร็จ'))))
-            .then((data) => {
-                if (cancelled) return;
-                if (data?.houses) { setStockIndex(data); setStockCheckError(data.stale ? 'ข้อมูลสต๊อกกลางอาจไม่ใช่ล่าสุด' : ''); }
-                else setStockCheckError('เช็คสต๊อกกลางไม่สำเร็จ');
-            })
-            .catch(() => { if (!cancelled) setStockCheckError('เช็คสต๊อกกลางไม่สำเร็จ'); });
-        return () => { cancelled = true; };
+    const loadStockCheck = useCallback(async ({ force = false } = {}) => {
+        setIsStockRefreshing(true);
+        try {
+            const res = await fetch(`/api/stock-check${force ? '?refresh=1' : ''}`);
+            if (!res.ok) throw new Error('เช็ค Master Stock ไม่สำเร็จ');
+            const data = await res.json();
+            if (!data?.houses) throw new Error('เช็ค Master Stock ไม่สำเร็จ');
+            setStockIndex(data);
+            setStockCheckError(data.stale ? 'ข้อมูล Master Stock อาจไม่ใช่ล่าสุด' : '');
+        } catch {
+            setStockCheckError('เช็ค Master Stock ไม่สำเร็จ');
+        } finally {
+            setIsStockRefreshing(false);
+        }
     }, []);
+
+    useEffect(() => { loadStockCheck(); }, [loadStockCheck]);
 
     const getStockAlert = (prop) => {
         if (!stockIndex?.houses) return null;
@@ -2730,6 +2736,14 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                                 เทียบกับ
                                                 <a href={stockIndex.sheetUrl} target="_blank" rel="noreferrer" className="underline hover:text-brand-green">Master Stock</a>
                                                 ของ All in One ({stockIndex.houseCount} หลัง) แล้ว — หลังที่มีป้าย <AlertTriangle size={11} className="text-red-500"/> คือไม่อยู่ในสต๊อกแล้ว ควรลบออกจากเว็บ
+                                                <button
+                                                    type="button"
+                                                    onClick={() => loadStockCheck({ force: true })}
+                                                    disabled={isStockRefreshing}
+                                                    className="underline hover:text-brand-green disabled:opacity-50"
+                                                >
+                                                    {isStockRefreshing ? 'กำลังโหลด...' : 'โหลดสต๊อกใหม่'}
+                                                </button>
                                             </p>
                                             {!stockIndex.coversPartners && (
                                                 <p className="text-xs text-amber-600 mt-1 flex items-center gap-1"><AlertTriangle size={12}/> อ่านชีตได้ไม่ครบ — ข้ามการเช็คบ้าน Partner ไว้ก่อน</p>
