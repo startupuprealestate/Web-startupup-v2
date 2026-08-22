@@ -2780,12 +2780,12 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                     const canToggleMore = !searchTerm && !alertOnly && items.length > OWNER_PREVIEW_COUNT;
                                     return (
                                     <section key={owner} className="space-y-3">
-                                        <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                                        <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm hover:border-brand-green/40 transition">
                                             <button
                                                 type="button"
                                                 onClick={() => toggleOwnerCollapse(owner)}
                                                 aria-expanded={!isCollapsed}
-                                                className="flex items-center gap-2 flex-wrap text-left min-w-0 group"
+                                                className="flex flex-1 items-center gap-2 flex-wrap text-left min-w-0 py-1 group"
                                             >
                                                 <ChevronDown size={16} className={`text-gray-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                                                 <Briefcase size={16} className="text-brand-green" />
@@ -2806,9 +2806,13 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
                                                         <AlertTriangle size={11}/> {alertCount} หลังต้องเช็ค
                                                     </button>
                                                 )}
-                                                <span className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleOwnerCollapse(owner)}
+                                                    className="text-xs text-gray-500 bg-gray-50 border border-gray-100 px-3 py-1 rounded-full hover:bg-gray-100 hover:text-gray-600 transition"
+                                                >
                                                     {items.length} รายการ{isCollapsed ? ' • กดเพื่อแสดง' : ''}
-                                                </span>
+                                                </button>
                                             </div>
                                         </div>
 
