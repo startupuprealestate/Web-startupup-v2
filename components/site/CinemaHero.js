@@ -950,36 +950,43 @@ export default function CinemaHero({
 
             <div className="shade" />
 
-            <h1 className="hero-title">
-              <span className="hero-title-main">{companyName}</span>
-              <span className="hero-title-sub">Real Estate</span>
-            </h1>
+            {/*
+              หัวเรื่องกับก้อนข้อความอยู่ในกล่องเดียวกัน แล้วให้กล่องจัดกึ่งกลางแนวตั้งทั้งจอ
+              ของเดิมแยกกันคนละตัว ตัวบนยึดขอบบน ตัวล่างยึดขอบล่าง ด้วยสูตรคนละสูตร
+              พอความสูงจอเปลี่ยน ระยะบน-ล่างจึงไม่เท่ากัน กลุ่มข้อความเลยลอยสูงกว่ากลางจอ
+            */}
+            <div className="hero-stack">
+              <h1 className="hero-title">
+                <span className="hero-title-main">{companyName}</span>
+                <span className="hero-title-sub">Real Estate</span>
+              </h1>
 
-            <div className="intro-copy">
-              <p className="intro-lead">
-                {tagline} — <CineText tag="span" field="cineTagline" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-              </p>
+              <div className="intro-copy">
+                <p className="intro-lead">
+                  {tagline} — <CineText tag="span" field="cineTagline" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+                </p>
 
-              {/*
-                ตัวเลขเล่าแบรนด์ — เป็นข้อความล้วน กดไม่ได้ เพราะไม่มีปลายทางให้ไป
-                เดิมเป็นปุ่มที่นับจำนวนจากคลังบ้านสด ๆ แล้วกดข้ามไปหน้ารวมบ้าน
-                พอเปลี่ยนเป็นตัวเลขภาพรวมของบริษัท การกดได้จะทำให้ลูกค้าคาดหวังผิด
-              */}
-              <div className="hero-stats">
-                {[1, 2, 3].map(i => (
-                  <div className="hero-stat" key={i}>
-                    <CineText tag="strong" field={`cineStat${i}Num`} copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-                    <CineText tag="span" field={`cineStat${i}Label`} copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-                  </div>
-                ))}
+                {/*
+                  ตัวเลขเล่าแบรนด์ — เป็นข้อความล้วน กดไม่ได้ เพราะไม่มีปลายทางให้ไป
+                  เดิมเป็นปุ่มที่นับจำนวนจากคลังบ้านสด ๆ แล้วกดข้ามไปหน้ารวมบ้าน
+                  พอเปลี่ยนเป็นตัวเลขภาพรวมของบริษัท การกดได้จะทำให้ลูกค้าคาดหวังผิด
+                */}
+                <div className="hero-stats">
+                  {[1, 2, 3].map(i => (
+                    <div className="hero-stat" key={i}>
+                      <CineText tag="strong" field={`cineStat${i}Num`} copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+                      <CineText tag="span" field={`cineStat${i}Label`} copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hero-tags">
+                  <CineText tag="span" field="cineTag1" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+                  <CineText tag="span" field="cineTag2" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+                  <CineText tag="span" field="cineTag3" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+                </div>
+                <div className="scroll-hint" aria-hidden="true"><span /></div>
               </div>
-
-              <div className="hero-tags">
-                <CineText tag="span" field="cineTag1" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-                <CineText tag="span" field="cineTag2" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-                <CineText tag="span" field="cineTag3" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-              </div>
-              <div className="scroll-hint" aria-hidden="true"><span /></div>
             </div>
 
             <section className="story-panel panel-lo" ref={el => { panelRefs.current.gate = el; }}>
@@ -1173,16 +1180,29 @@ const cinemaCss = `
     rgba(var(--blur-tint), var(--shade-mid-alpha)) 48%,
     rgba(var(--blur-tint), var(--shade-bottom-alpha)) 100%);
 }
+/**
+ * กล่องรวมหัวเรื่องกับก้อนข้อความ กินเต็มจอแล้วจัดกึ่งกลางแนวตั้งให้เอง
+ * ระยะเหนือหัวเรื่องกับใต้ปุ่มเลื่อนลงจึงเท่ากันเสมอ ไม่ว่าจอจะสูงเท่าไร
+ *
+ * ปิดรับคลิกไว้ เพราะข้อความในนี้กดไม่ได้อยู่แล้ว (ยกเว้นตอนแก้ข้อความจากหลังบ้าน)
+ * ถ้าไม่ปิด กล่องเปล่า ๆ นี้จะดักคลิกทับของที่อยู่ข้างหลังตอนมันจางหายไปแล้ว
+ */
+.cinema-scroll .hero-stack {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: clamp(22px, 4vh, 52px); padding: 0 16px;
+  pointer-events: none;
+}
+.cinema-scroll.is-editing .hero-stack { pointer-events: auto; }
 .cinema-scroll .hero-title {
-  position: absolute; z-index: 20; left: 50%; top: clamp(122px, 19vh, 205px);
-  width: min(94vw, 1780px); margin: 0; color: #fdf1e1;
+  max-width: 100%; margin: 0; color: #fdf1e1;
   font-family: Prompt, system-ui, sans-serif;
   font-size: 6.6rem; font-weight: 200; line-height: 1.06;
   text-transform: uppercase;
   text-align: center; text-shadow: 0 22px 60px rgba(0,0,0,0.42);
   display: flex; flex-direction: column; align-items: center;
   opacity: var(--title-opacity);
-  transform: translate3d(-50%, var(--title-y), 0) scale(var(--title-scale));
+  transform: translate3d(0, var(--title-y), 0) scale(var(--title-scale));
   will-change: transform, opacity;
 }
 /**
@@ -1214,17 +1234,12 @@ const cinemaCss = `
 }
 
 .cinema-scroll .intro-copy {
-  /**
-   * ยึดจากขอบล่าง ค่ายิ่งมากยิ่งลอยสูงขึ้นไปหาหัวเรื่อง
-   *
-   * ใช้ 81vh ลบค่าคงที่ แทนการใช้ vh เฉย ๆ เพื่อให้ "ระยะห่างจากหัวเรื่อง" คงที่ราว 100px ทุกจอ
-   * ถ้าใช้ vh ล้วน จอเตี้ยอย่างโน้ตบุ๊ก 768px จะยกไม่พอจนก้อนข้อความไปชิดหัวเรื่อง
-   * (หัวเรื่องเองก็ขยับตาม 19vh ทั้งสองก้อนจึงวิ่งเข้าหากันเมื่อจอเตี้ยลง)
-   */
-  position: absolute; z-index: 22; left: 50%; bottom: clamp(56px, calc(81vh - 507px), 380px);
-  width: min(620px, calc(100vw - 40px)); text-align: center;
+  /* ระยะห่างจากหัวเรื่องมาจาก gap ของ .hero-stack ไม่ต้องคำนวณจากขอบจออีก
+     isolation กันเงาวงรี (::before ที่ z-index -1) ไม่ให้หลุดไปอยู่หลังหัวเรื่อง */
+  position: relative; isolation: isolate;
+  width: min(620px, calc(100vw - 40px)); max-width: 100%; text-align: center;
   opacity: var(--intro-copy-opacity);
-  transform: translate3d(-50%, var(--intro-copy-y), 0);
+  transform: translate3d(0, var(--intro-copy-y), 0);
   will-change: transform, opacity;
 }
 .cinema-scroll .intro-copy::before {
@@ -1430,7 +1445,7 @@ const cinemaCss = `
   .cinema-scroll .story-panel h2 { font-size: 3rem; }
 }
 @media (max-width: 1100px) {
-  .cinema-scroll .hero-title { top: 15vh; font-size: 3.8rem; letter-spacing: 0.16em; }
+  .cinema-scroll .hero-title { font-size: 3.8rem; letter-spacing: 0.16em; }
   .cinema-scroll .story-panel h2 { font-size: 2.4rem; }
 }
 @media (max-width: 640px) {
@@ -1441,13 +1456,7 @@ const cinemaCss = `
   }
   .cinema-scroll .stage { min-height: 640px; }
   .cinema-scroll .scene { filter: none; will-change: transform, opacity; }
-  .cinema-scroll .hero-title { top: 17vh; font-size: 1.9rem; letter-spacing: 0.12em; }
-  /**
-   * ยกกลุ่มข้อความขึ้นให้ห่างจากหัวเรื่องพอ ๆ กับจอคอม
-   * ของเดิมตรึงไว้ 42px จากขอบล่าง ทำให้บนมือถือเว้นห่างจากหัวเรื่องถึง 300px
-   * สูตรนี้อิงความสูงจอ (หัวเรื่องอยู่ที่ 17vh) จึงได้ระยะห่างใกล้เคียงกันทุกเครื่อง
-   */
-  .cinema-scroll .intro-copy { bottom: clamp(24px, calc(83vh - 448px), 300px); }
+  .cinema-scroll .hero-title { font-size: 1.9rem; letter-spacing: 0.12em; }
   .cinema-scroll .intro-copy p, .cinema-scroll .story-panel p { font-size: 1rem; }
   .cinema-scroll .intro-lead { display: block; }
 
