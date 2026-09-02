@@ -32,13 +32,13 @@ import {
   getOptimizedImg, DEFAULT_LOCATIONS_DATA, DEFAULT_VISUAL_CONTENT, db, appId,
 } from './SiteApp';
 
-const Facebook = ({ size = 22 }) => (
+const Facebook = ({ size = 26 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
 );
-const Instagram = ({ size = 22 }) => (
+const Instagram = ({ size = 26 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
 );
-const Youtube = ({ size = 22 }) => (
+const Youtube = ({ size = 26 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.42a2.78 2.78 0 0 0-1.94 2C1 8.13 1 12 1 12s0 3.87.54 5.58a2.78 2.78 0 0 0 1.94 2C5.12 20 12 20 12 20s6.88 0 8.6-.42a2.78 2.78 0 0 0 1.94-2C23 15.87 23 12 23 12s0-3.87-.54-5.58z" /><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" /></svg>
 );
 
@@ -552,9 +552,9 @@ export default function SiteV4({ basePath = '/v4' }) {
               <div className="v4-social">
                 <a href={companyInfo?.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook"><Facebook /></a>
                 <a href="https://youtube.com/@startupupofficial" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><Youtube /></a>
-                <a href={companyInfo?.line} target="_blank" rel="noopener noreferrer" aria-label="LINE"><MessageCircle size={22} /></a>
+                <a href={companyInfo?.line} target="_blank" rel="noopener noreferrer" aria-label="LINE"><MessageCircle size={26} /></a>
                 <a href="https://www.instagram.com/startupuprealestate/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Instagram /></a>
-                <a href="https://www.tiktok.com/@startupupofficial" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Video size={22} /></a>
+                <a href="https://www.tiktok.com/@startupupofficial" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Video size={26} /></a>
               </div>
             </div>
           </div>
@@ -917,29 +917,33 @@ const v4Css = `
  */
 .v4-footer-inner {
   width: 100%; max-width: 1400px; margin: 0 auto; padding: 64px 28px 40px;
+  text-align: center;
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 40px;
 }
 .v4-footer h3 {
-  margin: 0 0 14px; font-size: 30px; font-weight: 300; letter-spacing: 0.2em;
+  margin: 0 0 16px; font-size: 36px; font-weight: 300; letter-spacing: 0.2em;
+  /* letter-spacing เติมช่องว่างท้ายตัวอักษรตัวสุดท้ายด้วย พอจัดกึ่งกลางจะเห็นเยื้องไปทางซ้าย
+     ดัน text-indent เท่ากันกลับเข้าไป บรรทัดจึงอยู่กลางจริง */
+  text-indent: 0.2em;
   font-family: var(--display); text-transform: uppercase;
 }
 .v4-footer h4 {
-  margin: 0 0 16px; font-size: 15px; font-weight: 500;
+  margin: 0 0 18px; font-size: 17px; font-weight: 500; text-indent: 0.16em;
   letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.75;
 }
 .v4-footer p, .v4-footer span, .v4-footer a {
-  display: block; color: rgba(253, 241, 225, 0.78); font-size: 16px;
+  display: block; color: rgba(253, 241, 225, 0.78); font-size: 18px;
   line-height: 1.7; text-decoration: none; margin-bottom: 6px;
 }
 .v4-footer a:hover { color: #fff; text-decoration: underline; }
-.v4-footer .v4-phone { font-size: 21px; color: var(--paper); margin: 10px 0; }
-.v4-social { display: flex; gap: 16px; margin-top: 4px; }
+.v4-footer .v4-phone { font-size: 25px; color: var(--paper); margin: 12px 0; }
+.v4-social { display: flex; justify-content: center; gap: 18px; margin-top: 6px; }
 .v4-social a { margin: 0; opacity: 0.8; transition: opacity 200ms ease, transform 200ms ease; }
 .v4-social a:hover { opacity: 1; transform: translateY(-2px); }
 .v4-footer-base {
   width: 100%; max-width: 1400px; margin: 0 auto; padding: 20px 28px 32px;
   border-top: 1px solid rgba(253, 241, 225, 0.18);
-  text-align: center; font-size: 14px; letter-spacing: 0.05em; opacity: 0.65;
+  text-align: center; font-size: 15px; letter-spacing: 0.05em; opacity: 0.65;
 }
 
 /* ---------- แถบโหมดแก้ไข ---------- */
