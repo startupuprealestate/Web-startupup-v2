@@ -856,7 +856,32 @@ const v4Css = `
 }
 
 /* ---------- ท้ายเว็บ ---------- */
-.v4-footer { margin-top: auto; background: #0b1f12; color: var(--paper); position: relative; z-index: 30; }
+/**
+ * พื้นหลังท้ายเว็บ — ภาพครอบครัวเล่นในสนามหลังบ้าน ซ้อนใต้ม่านสีเขียวเข้ม
+ * ม่านจำเป็น ไม่ใช่แค่ความสวย ถ้าไม่มี ตัวหนังสือครีมจะจมหายไปกับหญ้าที่โดนแดด
+ * ไล่เฉดเข้มหัว-ท้าย อ่อนตรงกลาง ภาพจึงยังเห็นเป็นภาพ ไม่ใช่แค่พื้นเขียวด่าง
+ *
+ * ต้นฉบับเป็น PNG 2.4 MB หนักเกินไปสำหรับพื้นหลัง แปลงเป็น webp เหลือ 153 KB
+ * แล้วทำตัวเล็ก 900px (48 KB) ไว้ให้มือถือ ซึ่งจอไม่กว้างพอจะเห็นความต่างอยู่แล้ว
+ */
+.v4-footer {
+  margin-top: auto; color: var(--paper); position: relative; z-index: 30;
+  background-color: #0b1f12;
+  background-image:
+    linear-gradient(180deg, rgba(6, 20, 10, 0.93) 0%, rgba(6, 20, 10, 0.78) 42%, rgba(6, 20, 10, 0.9) 100%),
+    url('/footer-bg.webp');
+  background-size: cover;
+  /* เลื่อนกรอบขึ้นมาหน่อย ให้แถบที่เห็นตกอยู่ตรงกลุ่มคน ไม่ใช่สนามหญ้าเปล่า */
+  background-position: center 35%;
+  background-repeat: no-repeat;
+}
+@media (max-width: 900px) {
+  .v4-footer {
+    background-image:
+      linear-gradient(180deg, rgba(6, 20, 10, 0.93) 0%, rgba(6, 20, 10, 0.8) 42%, rgba(6, 20, 10, 0.92) 100%),
+      url('/footer-bg-sm.webp');
+  }
+}
 .v4-footer-inner {
   max-width: 1400px; margin: 0 auto; padding: 64px 28px 40px;
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 40px;
