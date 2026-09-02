@@ -1890,10 +1890,10 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
                   <ChevronDown size={16} className={`transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
               </button>
 
+              {/* ยึดขอบซ้ายของปุ่ม ไม่ใช่ขอบขวา เพราะปุ่มตัวกรองอยู่ซ้ายสุดของแถว
+                  ถ้ายึดขวาแล้วแผงกว้าง 290px จะยื่นออกนอกจอทางซ้ายบนมือถือ
+                  และคุมความกว้างไม่ให้เกินจอด้วย เผื่อเครื่องที่จอแคบกว่า 290px */}
               {isFilterOpen && (
-                  {/* ยึดขอบซ้ายของปุ่ม ไม่ใช่ขอบขวา เพราะปุ่มตัวกรองอยู่ซ้ายสุดของแถว
-                      ถ้ายึดขวาแล้วแผงกว้าง 290px จะยื่นออกนอกจอทางซ้ายบนมือถือ
-                      และคุมความกว้างไม่ให้เกินจอด้วย ไม่งั้นจอแคบกว่า 290px ก็ยังล้น */}
                   <div className="absolute left-0 mt-2 w-[290px] max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] border border-gray-100 p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                       <div className="flex items-center justify-between mb-3">
                           <span className="text-sm font-medium text-brand-green">ทำเล</span>
