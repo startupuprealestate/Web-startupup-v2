@@ -48,6 +48,13 @@ const Youtube = ({ size = 26 }) => (
  */
 const STATION_AT = { locations: 2050, featured: 3740 };
 
+/**
+ * ลิงก์แผนที่ออฟฟิศ — ใช้ลิงก์ที่ปักหมุดไว้แล้ว ไม่ใช่ค้นหาจากข้อความที่อยู่
+ * ของเดิมส่งข้อความที่อยู่ไปให้ Google ค้นเอา ซึ่งบางทีได้หมุดผิดตำแหน่ง
+ * ถ้าย้ายออฟฟิศ ให้แก้ที่บรรทัดนี้ (ตัวข้อความที่อยู่แก้จากหลังบ้านได้ตามเดิม)
+ */
+const OFFICE_MAP_URL = 'https://maps.app.goo.gl/e3AGFWQjtbVMiBYS9';
+
 const NAV_TABS = [
   { key: 'home', fallback: 'หน้าหลัก', field: 'navHome' },
   /* ทำเลมาก่อนบ้านทั้งหมด — ลูกค้าส่วนใหญ่เลือกจากทำเลก่อนแล้วค่อยดูว่ามีบ้านอะไร */
@@ -541,7 +548,7 @@ export default function SiteV4({ basePath = '/v4' }) {
             <div className="v4-foot-contact">
               <h4>{label('contactTitle', 'ติดต่อเรา')}</h4>
               <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(companyInfo?.address || '')}`}
+                href={OFFICE_MAP_URL}
                 target="_blank" rel="noopener noreferrer"
               >{companyInfo?.address}</a>
               <a className="v4-phone" href={`tel:${companyInfo?.phone}`}>โทร {companyInfo?.phone}</a>
