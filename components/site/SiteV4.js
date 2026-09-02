@@ -909,8 +909,14 @@ const v4Css = `
     min-height: 0;
   }
 }
+/**
+ * width: 100% ขาดไม่ได้
+ * พอ .v4-footer กลายเป็น flex คอลัมน์ ลูกทั้งสองก้อนก็เป็น flex item
+ * margin: 0 auto ของ flex item คือ auto margin ตามแกนขวาง ซึ่งลบล้าง stretch ทิ้ง
+ * กล่องจึงหดเหลือเท่าเนื้อหา คอลัมน์ในตารางเลยกว้างไม่เท่ากันและกองอยู่กลางจอ
+ */
 .v4-footer-inner {
-  max-width: 1400px; margin: 0 auto; padding: 64px 28px 40px;
+  width: 100%; max-width: 1400px; margin: 0 auto; padding: 64px 28px 40px;
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 40px;
 }
 .v4-footer h3 {
@@ -931,7 +937,7 @@ const v4Css = `
 .v4-social a { margin: 0; opacity: 0.8; transition: opacity 200ms ease, transform 200ms ease; }
 .v4-social a:hover { opacity: 1; transform: translateY(-2px); }
 .v4-footer-base {
-  max-width: 1400px; margin: 0 auto; padding: 20px 28px 32px;
+  width: 100%; max-width: 1400px; margin: 0 auto; padding: 20px 28px 32px;
   border-top: 1px solid rgba(253, 241, 225, 0.18);
   text-align: center; font-size: 12px; letter-spacing: 0.05em; opacity: 0.6;
 }
