@@ -870,16 +870,34 @@ const v4Css = `
   background-image:
     linear-gradient(180deg, rgba(6, 20, 10, 0.93) 0%, rgba(6, 20, 10, 0.78) 42%, rgba(6, 20, 10, 0.9) 100%),
     url('/footer-bg.webp');
-  background-size: cover;
-  /* เลื่อนกรอบขึ้นมาหน่อย ให้แถบที่เห็นตกอยู่ตรงกลุ่มคน ไม่ใช่สนามหญ้าเปล่า */
-  background-position: center 35%;
+  background-position: center top;
   background-repeat: no-repeat;
+  /**
+   * กว้างเต็มจอ สูงตามสัดส่วนจริงของภาพ ไม่ตัดอะไรทิ้งเลย
+   * แล้วบังคับความสูงกล่องให้เท่ากับภาพพอดี ภาพจึงเต็มใบไม่มีขอบเขียวโผล่
+   *
+   * ใช้ cqw ไม่ใช่ vw เพราะ vw นับรวมความกว้างแถบเลื่อนด้วย
+   * กล่องจะสูงเกินภาพไปสิบกว่าพิกเซล เห็นเป็นแถบเขียวบาง ๆ ที่ก้น
+   */
+  container-type: inline-size;
+  background-size: 100% auto;
+  min-height: calc(100cqw / 2.3801);
+  /* เนื้อหาไม่พอเต็มกล่องที่สูงขึ้นแล้ว จัดกึ่งกลางไว้ ไม่งั้นจะลอยอยู่ด้านบน */
+  display: flex; flex-direction: column; justify-content: center;
 }
+/**
+ * จอแคบกลับไปใช้ cover ตามเดิม
+ * ภาพกว้าง 2.38:1 ถ้าโชว์เต็มใบบนมือถือจะเหลือแถบสูงแค่ราว 160px
+ * ขณะที่ข้อความท้ายเว็บสูงกว่า 500px กลายเป็นภาพแปะหัวแล้วเขียวโล่งทั้งท่อน
+ */
 @media (max-width: 900px) {
   .v4-footer {
     background-image:
       linear-gradient(180deg, rgba(6, 20, 10, 0.93) 0%, rgba(6, 20, 10, 0.8) 42%, rgba(6, 20, 10, 0.92) 100%),
       url('/footer-bg-sm.webp');
+    background-size: cover;
+    background-position: center 35%;
+    min-height: 0;
   }
 }
 .v4-footer-inner {
