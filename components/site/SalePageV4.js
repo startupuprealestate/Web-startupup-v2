@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, MapPin, Phone, MessageCircle, Calendar, Maximize, X,
+  ChevronLeft, ChevronRight, MapPin, Phone, Calendar,
 } from 'lucide-react';
 
 import {
@@ -104,7 +104,6 @@ export default function SalePageV4({
   const [videoOn, setVideoOn] = useState(false);
   const [saved, setSaved] = useState([]);
   const [toast, setToast] = useState('');
-  const [storyAt, setStoryAt] = useState(-1);   // -1 = ปิด
   const [bookOpen, setBookOpen] = useState(false);
   const [pickDate, setPickDate] = useState(null);   // Date ที่ลูกค้าเลือก
   const [hour, setHour] = useState('');
@@ -133,7 +132,7 @@ export default function SalePageV4({
   useEffect(() => { setSaved(readSaved()); }, []);
 
   useEffect(() => {
-    setAt(0); setWipe(null); setVideoOn(false); setStoryAt(-1);
+    setAt(0); setWipe(null); setVideoOn(false);
     setBookOpen(false); setPickDate(null); setHour(''); setMinute('');
   }, [property?.id]);
 
@@ -251,21 +250,15 @@ export default function SalePageV4({
     window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
   }, [property, houseAndSoi, pickDate, hour, minute, thaiDate]);
 
-  // คีย์บอร์ด: ลูกศรเลื่อนรูป Esc ปิดสตอรี่
+  // ลูกศรซ้าย-ขวาบนคีย์บอร์ดเลื่อนรูปได้
   useEffect(() => {
     const onKey = (e) => {
-      if (storyAt >= 0) {
-        if (e.key === 'Escape') setStoryAt(-1);
-        else if (e.key === 'ArrowLeft') setStoryAt((s) => (s - 1 + images.length) % images.length);
-        else if (e.key === 'ArrowRight') setStoryAt((s) => (s + 1) % images.length);
-        return;
-      }
       if (e.key === 'ArrowLeft') goTo(at - 1, -1);
       else if (e.key === 'ArrowRight') goTo(at + 1, 1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [storyAt, images.length, at, goTo]);
+  }, [at, goTo]);
 
   if (!property) return null;
 
@@ -276,6 +269,13 @@ export default function SalePageV4({
 
   return (
     <div className="sp4">
+      {/* พื้นหลังจางจากรูปแรกของอัลบั้ม เปลี่ยนตามบ้านแต่ละหลังเอง */}
+      <div
+        className="sp4-bg"
+        aria-hidden="true"
+        style={{ backgroundImage: `url(${getOptimizedImg(images[0], 1200)})` }}
+      />
+
       {/* ── แถวควบคุมบนสุด ── */}
       <div className="sp4-topline">
         <button type="button" className="sp4-back" onClick={onBack}>
@@ -362,10 +362,6 @@ export default function SalePageV4({
             : badge && <span className="sp4-flag">{badge === 'Promotion' ? 'โปรโมชั่น' : badge === 'New' ? 'มาใหม่' : badge}</span>}
 
           <span className="sp4-counter">{at + 1} / {images.length}</span>
-
-          <button type="button" className="sp4-full" onClick={() => setStoryAt(at)}>
-            <Maximize size={14} /> ดูเต็มจอ
-          </button>
 
           {images.length > 1 && (
             <>
@@ -514,7 +510,7 @@ export default function SalePageV4({
                 <Phone size={16} /> {companyInfo?.phone}
               </a>
               <a className={`sp4-act line${isEditMode ? ' is-off' : ''}`} href={isEditMode ? '#' : companyInfo?.line} target="_blank" rel="noopener noreferrer">
-                <MessageCircle size={16} /> ทักไลน์
+                <img src="/brand/line.png" alt="" width="18" height="18" className="sp4-lineico" /> ทักไลน์
               </a>
               <button type="button" className="sp4-act line" aria-expanded={bookOpen} onClick={() => setBookOpen((v) => !v)}>
                 <Calendar size={16} /> นัดเข้าชมบ้าน
@@ -572,6 +568,7 @@ export default function SalePageV4({
                 )}
 
                 <button type="button" className="sp4-book-send" disabled={!bookReady || isEditMode} onClick={sendBooking}>
+                  <img src="/brand/line.png" alt="" width="18" height="18" className="sp4-lineico" />
                   ส่งนัดผ่านไลน์
                 </button>
               </div>
@@ -628,21 +625,6 @@ export default function SalePageV4({
         </section>
       )}
 
-      {/* ── ดูรูปเต็มจอแบบสตอรี่ ── */}
-      {storyAt >= 0 && (
-        <div className="sp4-story" role="dialog" aria-modal="true" aria-label="ดูรูปเต็มจอ">
-          <div className="sp4-story-bars">
-            {images.map((_, i) => (
-              <span key={i} className={`sp4-bar${i < storyAt ? ' is-done' : ''}${i === storyAt ? ' is-live' : ''}`}><i /></span>
-            ))}
-          </div>
-          <SmartImage src={getOptimizedImg(images[storyAt], 1600)} alt={property.project_name} width={1600} height={1000} sizes="100vw" className="sp4-story-img" priority />
-          <button type="button" className="sp4-story-zone left" aria-label="รูปก่อนหน้า" onClick={() => setStoryAt((s) => (s - 1 + images.length) % images.length)} />
-          <button type="button" className="sp4-story-zone right" aria-label="รูปถัดไป" onClick={() => setStoryAt((s) => (s + 1) % images.length)} />
-          <button type="button" className="sp4-story-x" aria-label="ปิด" onClick={() => setStoryAt(-1)}><X size={20} /></button>
-        </div>
-      )}
-
       {toast && <div className="sp4-toast" role="status">{toast}</div>}
 
       <style>{css}</style>
@@ -664,6 +646,7 @@ const css = `
   --ink-faint: #9ca3af;      /* text-gray-400 */
   --line: #f3f4f6;           /* border-gray-100 */
   --line-firm: #e5e7eb;      /* border-gray-200 */
+  --line-green: rgba(11, 61, 27, .30);   /* เส้นขอบชิปทุกชนิด ใช้เขียว CI */
   --forest: #0b3d1b;         /* brand.green */
   --brand-light: #eef3f0;    /* brand.light */
   --sun: #d97706;            /* ใช้จุดเดียว: ดวงอาทิตย์บนหน้าปัดทิศ */
@@ -674,7 +657,28 @@ const css = `
   background: var(--paper); color: var(--ink);
   font-weight: 300; line-height: 1.75;
   container-type: inline-size;
-  position: relative; overflow: hidden;
+  position: relative; overflow: hidden; isolation: isolate;
+}
+
+/* ── พื้นหลังจากรูปแรกของอัลบั้ม ──
+   เบลอแรงและจางมาก ทำหน้าที่เป็นบรรยากาศ ไม่ใช่ภาพให้ดู
+   ไล่ขาวทับอีกชั้นเพื่อให้ตัวหนังสือยังอ่านชัดเท่าเดิม
+   z-index -1 คู่กับ isolation ที่ .sp4 เพื่อไม่ให้หลุดไปอยู่หลังทั้งหน้า */
+.sp4-bg {
+  position: absolute; inset: -8%; z-index: -1; pointer-events: none;
+  background-size: cover; background-position: center;
+  filter: blur(30px) saturate(1.2);
+  opacity: .18;
+  animation: sp4bg 48s ease-in-out infinite alternate;
+}
+.sp4-bg::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(to bottom,
+    rgba(248,250,252,.5), rgba(248,250,252,.86) 46%, var(--paper) 78%);
+}
+@keyframes sp4bg {
+  from { transform: scale(1.04); }
+  to   { transform: scale(1.14) translate3d(-1.6%, -1.2%, 0); }
 }
 .sp4 * { box-sizing: border-box; }
 .sp4 :focus-visible { outline: 2px solid var(--forest); outline-offset: 3px; border-radius: var(--r1); }
@@ -702,7 +706,7 @@ const css = `
 .sp4-masthead { max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter) var(--s3); }
 .sp4-eyebrow {
   margin: 0 0 var(--s2); display: inline-block;
-  border: 1px solid rgba(169,118,47,.3); border-radius: var(--r4); padding: 5px 14px;
+  border: 1px solid var(--line-green); border-radius: var(--r4); padding: 5px 14px;
   font-size: 12px; font-weight: 500; letter-spacing: .02em; color: var(--forest);
 }
 .sp4-title {
@@ -712,14 +716,12 @@ const css = `
 .sp4-idents { margin: var(--s3) 0 0; display: flex; flex-wrap: wrap; gap: var(--s1) 10px; }
 .sp4-ident {
   display: inline-flex; align-items: center; gap: 8px; padding: 8px 15px;
-  border-radius: var(--r4); border: 1px solid var(--line); background: var(--paper-soft);
+  border-radius: var(--r4); border: 1px solid var(--line-green); background: var(--card);
   font-size: 14px; color: var(--ink-soft);
 }
 .sp4-ident b { font-weight: 500; color: var(--ink); }
 .sp4-ident svg { color: var(--forest); flex: 0 0 auto; }
-.sp4-ident.is-loc { background: var(--forest); border-color: var(--forest); color: #fff; }
-.sp4-ident.is-loc b { color: #fff; font-weight: 400; }
-.sp4-ident.is-loc svg { color: #fff; opacity: .8; }
+.sp4-ident.is-loc b { color: var(--forest); font-weight: 500; }
 
 .sp4-stage {
   width: 100%; margin: 0; background: var(--paper-soft);
@@ -742,18 +744,12 @@ const css = `
 @keyframes sp4wipe     { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
 @keyframes sp4wipeBack { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
 
-.sp4-counter, .sp4-flag, .sp4-full {
+.sp4-counter, .sp4-flag {
   position: absolute; border-radius: var(--r4); letter-spacing: .12em;
   backdrop-filter: blur(8px); z-index: 3;
 }
 .sp4-counter { right: 14px; bottom: 14px; font-size: 11px; color: #fff; background: rgba(17,24,39,.62); padding: 6px 14px; }
 .sp4-flag { left: 14px; top: 14px; font-size: 10px; color: #fff; background: var(--forest); padding: 6px 15px; }
-.sp4-full {
-  right: 14px; top: 14px; display: inline-flex; align-items: center; gap: 7px;
-  border: 0; cursor: pointer; padding: 8px 15px; font: inherit; font-size: 12px;
-  background: rgba(17,24,39,.62); color: #fff; transition: background .2s;
-}
-.sp4-full:hover { background: rgba(17,24,39,.85); }
 
 .sp4-nav {
   position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
@@ -853,7 +849,7 @@ const css = `
 .sp4-tags { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .sp4-tags span {
   font-size: 13px; color: var(--ink-soft); border-radius: var(--r4);
-  border: 1px solid var(--line); padding: 7px 16px; transition: border-color .24s, color .24s;
+  border: 1px solid var(--line-green); padding: 7px 16px; transition: background .24s, color .24s;
 }
 .sp4-tags span:hover { border-color: rgba(11,61,27,.3); color: var(--forest); }
 
@@ -944,8 +940,10 @@ const css = `
   background: var(--brand-light); border: 1px solid var(--line);
   font-size: 13px; color: var(--forest);
 }
+.sp4-lineico { display: inline-block; flex: 0 0 auto; }
 .sp4-book-send {
   width: 100%; margin-top: var(--s2); padding: 13px; cursor: pointer; border: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   border-radius: var(--r4); background: #06C755; color: #06301a; font: inherit; font-size: 14px; font-weight: 500;
   transition: filter .2s, transform .2s;
 }
@@ -1000,21 +998,6 @@ const css = `
 .sp4-cardfav.is-on { color: #b8384a; }
 .sp4-cardfav.is-on svg { fill: #b8384a; }
 
-.sp4-story { position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; background: #07110b; }
-.sp4-story-img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.sp4-story-bars { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 2; display: flex; gap: 5px; }
-.sp4-bar { flex: 1; height: 3px; border-radius: 3px; background: rgba(255,255,255,.28); overflow: hidden; }
-.sp4-bar i { display: block; height: 100%; width: 0; background: #fff; }
-.sp4-bar.is-done i { width: 100%; }
-.sp4-bar.is-live i { animation: sp4bar 4.6s linear forwards; }
-@keyframes sp4bar { to { width: 100%; } }
-.sp4-story-zone { position: absolute; top: 0; bottom: 0; width: 38%; cursor: pointer; z-index: 1; border: 0; background: none; }
-.sp4-story-zone.left { left: 0; } .sp4-story-zone.right { right: 0; }
-.sp4-story-x {
-  position: absolute; top: 28px; right: 16px; z-index: 3;
-  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-  border: 0; border-radius: var(--r4); cursor: pointer; background: rgba(255,255,255,.18); color: #fff;
-}
 
 .sp4-toast {
   position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 500;
@@ -1023,9 +1006,9 @@ const css = `
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sp4-bg { animation: none; }
   .sp4-layer img, .sp4-dial .sun-orbit, .sp4-dial .needle,
-  .sp4-pcard-img img, .sp4-bar.is-live i { animation: none; transition: none; }
-  .sp4-nav:hover { transform: translateY(-50%); }
+  .sp4-pcard-img img,   .sp4-nav:hover { transform: translateY(-50%); }
   .sp4-back:hover, .sp4-act:hover, .sp4-mapbtn:hover, .sp4-strip button:hover,
   .sp4-pcard:hover .sp4-pcard-img img { transform: none; }
 }
