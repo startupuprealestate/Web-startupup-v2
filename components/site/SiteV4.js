@@ -201,9 +201,28 @@ export default function SiteV4({ basePath = '/v4' }) {
   const goHomeTop = useCallback(() => {
     if (isVisualEditMode) return;
     goTab('home');
-    const toTop = () => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+
+    /**
+     * บนมือถือฉากเปิดเปิด scroll-snap ของ CSS ไว้ที่ตัว html
+     * ซึ่งคอยดูดหน้ากลับไปหาจุดจอดที่ใกล้ที่สุดตลอด และมันชนะ scroll แบบ smooth
+     * เลื่อนขึ้นไปได้ไม่ทันถึงบนสุดก็โดนดูดกลับ กลายเป็นกดโลโก้แล้วเหมือนไม่มีอะไรเกิดขึ้น
+     * จึงต้องปิด snap ทิ้งชั่วคราวระหว่างเลื่อน แล้วค่อยคืนค่าให้
+     *
+     * และบนจอสัมผัสใช้เลื่อนแบบทันที ไม่ใช่ smooth
+     * เพราะ smooth บนมือถือถูกยกเลิกได้ง่ายมาก แค่นิ้วยังแตะจออยู่ก็หยุดแล้ว
+     */
+    const root = document.documentElement;
+    const prevSnap = root.style.scrollSnapType;
+    root.style.scrollSnapType = 'none';
+
+    const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(hover: none)').matches;
+    const toTop = () => window.scrollTo({ top: 0, left: 0, behavior: coarse ? 'auto' : 'smooth' });
+
+    toTop();
     requestAnimationFrame(toTop);
+    /* ย้ำอีกครั้งหลังพ้นเวลาหน่วงของตัวดูดเข้าสถานีใน CinemaHero (SNAP_IDLE = 150ms) */
     setTimeout(toTop, 220);
+    setTimeout(() => { toTop(); root.style.scrollSnapType = prevSnap; }, 500);
   }, [goTab, isVisualEditMode]);
 
   const goStation = useCallback((at) => {
@@ -682,6 +701,9 @@ const v4Css = `
 .v4-logo {
   display: inline-flex; align-items: center; border: 0; background: none;
   padding: 0; cursor: pointer; color: var(--brand);
+  /* กันแตะพลาดบนมือถือ ให้เป้ากว้างพอตามเกณฑ์ และตัดหน่วง 300ms ของเบราว์เซอร์ทิ้ง */
+  min-width: 44px; min-height: 44px; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   font-family: var(--display); font-size: 22px; font-weight: 300; letter-spacing: 0.2em;
   white-space: nowrap;
 }
