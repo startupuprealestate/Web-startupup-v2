@@ -522,11 +522,14 @@ export default function CinemaHero({
         layer.style.setProperty('--sc', (BASE_SCALE + progress * 0.04).toFixed(4));
       }
 
-      /* --- หัวเรื่องกับข้อความเปิด --- */
-      section.style.setProperty('--title-y', `${(introExit * -210 + py * 6).toFixed(2)}px`);
+      /* --- หัวเรื่องกับข้อความเปิด ---
+         ตอนจางหาย หัวเรื่องลอยขึ้น ข้อความจมลง สองก้อนจึงถ่างออกจากกัน
+         ของเดิมถ่างกันได้ถึง 300px ระหว่างเลื่อน ทำให้ช่องว่างกลางดูโหว่
+         ลดเหลือ 214px ยังเห็นเป็นการแยกจากกันอยู่ แต่ไม่ขาดออกจากกัน */
+      section.style.setProperty('--title-y', `${(introExit * -150 + py * 6).toFixed(2)}px`);
       section.style.setProperty('--title-scale', (1 - introExit * 0.08).toFixed(4));
       section.style.setProperty('--title-opacity', (1 - introExit).toFixed(4));
-      section.style.setProperty('--intro-copy-y', `${(introExit * 90).toFixed(2)}px`);
+      section.style.setProperty('--intro-copy-y', `${(introExit * 64).toFixed(2)}px`);
       section.style.setProperty('--intro-copy-opacity', (1 - introExit).toFixed(4));
 
       /* --- แผ่นข้อความ --- */
@@ -1190,7 +1193,7 @@ const cinemaCss = `
 .cinema-scroll .hero-stack {
   position: absolute; inset: 0; z-index: 20;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: clamp(22px, 4vh, 52px); padding: 0 16px;
+  gap: clamp(10px, 1.8vh, 26px); padding: 0 16px;
   pointer-events: none;
 }
 .cinema-scroll.is-editing .hero-stack { pointer-events: auto; }
