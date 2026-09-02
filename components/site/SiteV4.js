@@ -119,6 +119,25 @@ export default function SiteV4({ basePath = '/v4' }) {
    * ต้องรอให้ฉากถูก render ก่อนถึงจะวัด offsetTop ได้ จึงเช็คซ้ำเป็นจังหวะ
    * (ฉากยาวหลายพันพิกเซล การ์ดทำเลอยู่ช่วง 1480-2520 เลือก 2000 ซึ่งเป็นจุดที่โผล่เต็ม)
    */
+  /**
+   * กลับไปบนสุด (ฉากประตูหน้าบ้าน)
+   *
+   * goTab เรียก jumpTop ให้อยู่แล้ว แต่ตอนอยู่ในฉากเปิดมันไม่พอ
+   * เพราะ activeTab เป็น 'home' อยู่แล้ว React จึงไม่ re-render อะไร
+   * และเอนจินของฉากเปิดมีตัวดูดเข้าสถานีที่สั่ง window.scrollTo ได้เอง
+   * พอเลื่อนขึ้นบนแล้วเกิด event scroll มันจะตั้งเวลาไว้ดูดต่ออีกที
+   *
+   * จึงย้ำคำสั่งอีกสองจังหวะ หลัง React วาดเสร็จ และหลังพ้นเวลาหน่วงของตัวดูด
+   * (SNAP_IDLE = 150ms ใน CinemaHero) เพื่อให้ชนะไม่ว่าอะไรจะแทรกเข้ามา
+   */
+  const goHomeTop = useCallback(() => {
+    if (isVisualEditMode) return;
+    goTab('home');
+    const toTop = () => window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    requestAnimationFrame(toTop);
+    setTimeout(toTop, 220);
+  }, [goTab, isVisualEditMode]);
+
   const goStation = useCallback((at) => {
     if (isVisualEditMode) return;
     if (activeTab !== 'home' || selectedProperty) goTab('home');
@@ -141,10 +160,11 @@ export default function SiteV4({ basePath = '/v4' }) {
    * แท็บ location กับ all ยังอยู่ เพราะปุ่มอื่นในหน้ายังลิงก์เข้าไปได้
    */
   const onNavTab = useCallback((key) => {
+    if (key === 'home') { goHomeTop(); return; }
     if (key === 'location') { goStation(STATION_AT.locations); return; }
     if (key === 'all') { goStation(STATION_AT.featured); return; }
     goTab(key);
-  }, [goStation, goTab]);
+  }, [goHomeTop, goStation, goTab]);
   const label = (field, fallback) => visualContent?.[field] || DEFAULT_VISUAL_CONTENT[field] || fallback;
 
   return (
@@ -194,7 +214,7 @@ export default function SiteV4({ basePath = '/v4' }) {
               type="button"
               className="v4-logo"
               disabled={isVisualEditMode}
-              onClick={() => goTab('home')}
+              onClick={goHomeTop}
             >
               {companyInfo?.logoUrl
                 ? <SmartImage src={getOptimizedImg(companyInfo.logoUrl, 220)} alt={companyInfo?.name || 'STARTUP UP'} />
