@@ -131,17 +131,21 @@ export default function SiteV4({ basePath = '/v4' }) {
    * useSiteData จะล้างพารามิเตอร์นี้ออกจากแถบที่อยู่เองในจังหวะถัดไป
    * รอให้โหลดเสร็จก่อนค่อยตัดสินใจ เพราะสิทธิ์ของบัญชีเพิ่งกู้คืนมาจาก Firebase
    */
-  const [adminEntryPending, setAdminEntryPending] = useState(false);
+  /* อ่านตั้งแต่ render แรกเลย ไม่ใช่ใน useEffect
+     เพราะ useSiteData ล้าง query string ทิ้งด้วย pushState ตั้งแต่จังหวะต้น ๆ
+     ถ้าอ่านช้ากว่านั้นแม้เสี้ยววินาที ?admin=1 จะหายไปก่อนได้อ่าน */
+  const [adminEntryPending, setAdminEntryPending] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try { return new URLSearchParams(window.location.search).get('admin') === '1'; }
+    catch (e) { return false; }
+  });
   useEffect(() => {
-    try {
-      if (new URLSearchParams(window.location.search).get('admin') === '1') setAdminEntryPending(true);
-    } catch (e) { /* ไม่มี window ก็ข้ามไป */ }
-  }, []);
-  useEffect(() => {
-    if (!adminEntryPending || loading) return;
+    if (!adminEntryPending) return;
     setAdminEntryPending(false);
+    /* ห้ามรอ loading เด็ดขาด ถ้าโหลดข้อมูลค้าง มันรอได้ถึง 20 วินาทีก่อนยอมแพ้
+       ระหว่างนั้นหน้าจะเงียบสนิทเหมือนลิงก์ใช้ไม่ได้ */
     if (userRole) setShowAdminPanel(true); else setShowLoginModal(true);
-  }, [adminEntryPending, loading, userRole, setShowAdminPanel, setShowLoginModal]);
+  }, [adminEntryPending, userRole, setShowAdminPanel, setShowLoginModal]);
 
   const isCinemaView = activeTab === 'home' && !selectedProperty && !requestedPropSlug;
   const isWaiting = loading || Boolean(requestedPropSlug);
