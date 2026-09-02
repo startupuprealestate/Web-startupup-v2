@@ -333,6 +333,7 @@ export default function SalePageV4({
       {/* ── ชื่อบ้าน อยู่ก่อนรูปเหมือน SalePage เดิม ── */}
       <div className="sp4-masthead reveal-on-scroll">
         {property.category && <p className="sp4-eyebrow">{property.category}</p>}
+        <p className="sp4-title-key">ชื่อโครงการ</p>
         <h1 className="sp4-title">{property.project_name}</h1>
         <div className="sp4-idents">
           {houseAndSoi.hn && (
@@ -742,6 +743,10 @@ const css = `
   margin: 0 0 var(--s2); display: inline-block;
   border: 1px solid var(--line-green); border-radius: var(--r4); padding: 5px 14px;
   font-size: 12px; font-weight: 500; letter-spacing: .02em; color: var(--forest);
+}
+/* หัวข้อกำกับ ใช้สเปกเดียวกับ "ราคาขาย" เพื่อให้สองหัวข้อหลักของหน้าอ่านเป็นชุดเดียวกัน */
+.sp4-title-key {
+  margin: 0 0 4px; font-size: 16px; font-weight: 500; color: var(--forest);
 }
 .sp4-title {
   margin: 0; font-size: clamp(23px, 4.2cqw, 56px); font-weight: 300;
