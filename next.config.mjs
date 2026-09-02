@@ -35,6 +35,9 @@ const contentSecurityPolicy = [
     "https://*.google-analytics.com",
     "https://stats.g.doubleclick.net",
     "https://*.basemaps.cartocdn.com",
+    "https://server.arcgisonline.com",
+    "https://tile.openstreetmap.org",
+    "https://*.tile.openstreetmap.org",
     "https://placehold.co"
   ].join(' '),
   "media-src 'self' https://res.cloudinary.com https://*.cloudinary.com",
@@ -47,6 +50,7 @@ const contentSecurityPolicy = [
     "https://*.google.com",
     "https://*.gstatic.com",
     "https://raw.githubusercontent.com",
+    "https://api.open-meteo.com",
     "https://identitytoolkit.googleapis.com",
     "https://securetoken.googleapis.com",
     "https://firebaseinstallations.googleapis.com",
@@ -65,12 +69,37 @@ const contentSecurityPolicy = [
   "child-src 'self' https://www.youtube-nocookie.com https://www.google.com https://maps.google.com https://*.google.com https://accounts.google.com https://*.firebaseapp.com https://tagassistant.google.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  "upgrade-insecure-requests"
+  /**
+   * upgrade-insecure-requests บังคับให้ทุกไฟล์ย่อยโหลดผ่าน https
+   * บนเว็บจริงถูกต้อง แต่ตอน dev เสิร์ฟผ่าน http ล้วน (โดยเฉพาะเปิดจากมือถือผ่าน IP วงแลน)
+   * ทุกไฟล์จะถูกดันไป https แล้วล้มด้วย ERR_SSL_PROTOCOL_ERROR จนหน้าเว็บว่างเปล่า
+   * จึงใส่เฉพาะตอน build จริงเท่านั้น
+   */
+  ...(isDevelopment ? [] : ["upgrade-insecure-requests"])
 ].join('; ');
+
+/* HSTS ก็เหมือนกัน — ถ้าส่งตอน dev เบราว์เซอร์จะจำไว้แล้วบังคับ https กับ host นั้นยาวถึง 2 ปี */
+const securityHeaders = [
+  { key: 'Content-Security-Policy', value: contentSecurityPolicy },
+  ...(isDevelopment ? [] : [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' }]),
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self), clipboard-write=(self)' },
+  { key: 'X-DNS-Prefetch-Control', value: 'on' },
+];
 
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  /**
+   * lucide-react เป็น barrel ก้อนใหญ่ SiteApp.js ดึงไอคอนจากมันทีเดียว 40 ตัว
+   * ถ้าไม่บอก Next มันจะเดินทั้ง module graph ของไลบรารีก่อนค่อย tree-shake
+   * ตัวนี้ทำให้ import ถูกแตกเป็นรายไฟล์อัตโนมัติ ลด first-load JS
+   */
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
   async redirects() {
     return [
       {
@@ -90,14 +119,14 @@ const nextConfig = {
     return [
       {
         source: '/:path*',
+        headers: securityHeaders,
+      },
+      {
+        // วิดีโอฉากเปิดมีเลขเวอร์ชันในชื่อไฟล์อยู่แล้ว (house-scrub-v1.mp4) แคชยาวได้ปลอดภัย
+        // เวลาแปลงใหม่ให้ขึ้นเป็น -v2 ห้ามทับไฟล์เดิม ไม่งั้น CDN จะจ่ายของเก่า
+        source: '/video/:path*',
         headers: [
-          { key: 'Content-Security-Policy', value: contentSecurityPolicy },
-          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self), clipboard-write=(self)' },
-          { key: 'X-DNS-Prefetch-Control', value: 'on' }
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }
         ],
       },
     ];

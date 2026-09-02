@@ -41,3 +41,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# design system package
+ds/node_modules
+ds/dist
+
+# design-sync (claude.ai/design) working files
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+
+# วิดีโอฉากเปิด ย้ายขึ้น Cloudinary แล้ว (รวม 25 MB) ไม่ต้องเก็บใน repo
+public/video/
