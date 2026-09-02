@@ -628,8 +628,13 @@ export default function CinemaHero({
 
       if (hudRef.current) {
         const vt = vid ? vid.currentTime : 0;
+        const rs = vid ? vid.readyState : -1;      // 0 = ยังไม่มีข้อมูลเลย ซีคไม่ได้
+        const ns = vid ? vid.networkState : -1;    // 3 = ไม่มีแหล่งวิดีโอ
+        const buf = vid && vid.buffered.length ? vid.buffered.end(vid.buffered.length - 1) : 0;
         hudRef.current.textContent =
-          `px ${Math.round(s)}  |  t ${vt.toFixed(2)}s / ${VIDEO_DURATION}s  |  ${mode}`;
+          `px ${Math.round(s)} | t ${vt.toFixed(2)}/${VIDEO_DURATION} | ${mode}`
+          + ` | ready ${rs} net ${ns} buf ${buf.toFixed(1)}s`
+          + ` | ${videoDead ? 'DEAD' : 'ok'}${seekPending ? ' seeking' : ''}`;
       }
 
       if (
@@ -798,6 +803,9 @@ export default function CinemaHero({
       const v = videoRef.current;
       if (!v || unlocked || disposed) return;
       v.muted = true;
+      /* iOS มักเมิน preload="auto" จนกว่าจะมี user gesture ทำให้ readyState ค้างที่ 0
+         แล้วเงื่อนไข readyState >= 1 ในลูปซีคไม่มีวันเป็นจริง ประตูจึงไม่เปิดสักที */
+      if (v.readyState === 0) { try { v.load(); } catch (e) { /* ไม่เป็นไร */ } }
       let p;
       try { p = v.play(); } catch (e) { return; }
       /**
@@ -899,6 +907,10 @@ export default function CinemaHero({
                   ref={videoRef}
                   className={`scene-main cine-video${videoReady ? ' is-ready' : ''}`}
                   src={scrubSrc}
+                  /* วิดีโออยู่บน Cloudinary = คนละโดเมน ต้องขอแบบ CORS ให้ชัด
+                     ปลายทางส่ง Access-Control-Allow-Origin: * มาอยู่แล้ว
+                     ถ้าไม่ใส่ Safari จะถือว่าเป็นสื่อปนเปื้อนแล้วซีคได้ไม่เต็มที่ */
+                  crossOrigin="anonymous"
                   /* พอวิดีโอพร้อมแล้วต้องถอด poster ทิ้ง ไม่งั้นบางเบราว์เซอร์บนมือถือ
                      จะวาดภาพ poster (เฟรมแรก = ประตูปิด) แทรกขึ้นมาระหว่างที่กำลังซีค
                      เห็นเป็นภาพกระพริบกลับไปต้นเรื่องเป็นระยะ เหมือนหน้าเว็บรีเฟรชเอง */
