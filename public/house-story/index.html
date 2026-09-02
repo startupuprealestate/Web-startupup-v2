@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>STARTUP UP — บ้านหลังนี้เปิดรอคุณอยู่</title>
+<meta name="description" content="เรื่องเล่าแบบภาพยนตร์ เลื่อนจากหน้าประตูบ้าน เข้าสวน แล้วเข้าไปในบ้านกับ STARTUP UP" />
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&family=Noto+Serif+Thai:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="preload" as="image" href="img/gate-closed.jpg" />
+<link rel="preload" as="image" href="img/gate-open.jpg" />
+<link rel="stylesheet" href="styles.css" />
+<script src="script.js" defer></script>
+</head>
+<body>
+<main class="site-shell">
+  <section class="cinema-scroll" id="cinema" aria-label="เรื่องเล่าบ้าน STARTUP UP แบบเลื่อนหน้าจอ">
+    <div class="stage">
+      <div class="world">
+
+        <!-- ฉากที่ 2 : หน้าบ้านเปิดประตู (อยู่หลังบานประตู รอถูกเปิดเผย) -->
+        <img class="scene scene-base" id="sc-gate-open" src="img/gate-open.jpg" alt="" />
+
+        <!-- ฉากที่ 1 : หน้าบ้านปิดประตู ถูกผ่าเป็นบานซ้าย/ขวา แล้วเปิดออก -->
+        <img class="scene gate-half gate-left"  id="sc-gate-left"  src="img/gate-closed.jpg" alt="" />
+        <img class="scene gate-half gate-right" id="sc-gate-right" src="img/gate-closed.jpg" alt="" />
+
+        <!-- ฉากที่ 3-4 : ในสวน -->
+        <img class="scene" id="sc-garden-1" src="img/garden-1.jpg" alt="" loading="lazy" />
+        <img class="scene" id="sc-garden-2" src="img/garden-2.jpg" alt="" loading="lazy" />
+
+        <!-- ฉากที่ 5-8 : ในบ้าน -->
+        <img class="scene" id="sc-room-1" src="img/room-1.jpg" alt="" loading="lazy" />
+        <img class="scene" id="sc-room-2" src="img/room-2.jpg" alt="" loading="lazy" />
+        <img class="scene" id="sc-room-3" src="img/room-3.jpg" alt="" loading="lazy" />
+        <img class="scene" id="sc-room-4" src="img/room-4.jpg" alt="" loading="lazy" />
+
+        <div class="shade"></div>
+
+        <header class="site-header" aria-label="เมนูหลัก">
+          <a class="site-logo" href="#cinema" data-at="0">STARTUP UP</a>
+          <nav class="site-nav" aria-label="เมนู">
+            <a href="#cinema" data-at="0">หน้าบ้าน</a>
+            <a href="#garden" data-at="3700">สวน</a>
+            <a href="#rooms" data-at="4900">ในบ้าน</a>
+            <a href="#tour" data-at="2350">นัดชมบ้าน</a>
+          </nav>
+          <button class="language-switcher" type="button" aria-label="เปลี่ยนภาษา">
+            <span>TH</span>
+            <span aria-hidden="true">⌄</span>
+          </button>
+        </header>
+
+        <h1 class="hero-title">STARTUP UP</h1>
+
+        <section class="intro-copy" aria-label="แนะนำโครงการ">
+          <p>จุดเริ่มต้นของคนอยากมีบ้าน — เลื่อนลงเพื่อเดินเข้าบ้านหลังนี้ไปด้วยกัน</p>
+          <div class="hero-tags" aria-label="จุดเด่นของบ้าน">
+            <span>บ้านพร้อมอยู่</span>
+            <span>สวนส่วนตัว</span>
+            <span>ดูแลถึงวันโอน</span>
+          </div>
+          <div class="scroll-hint" aria-hidden="true"><span></span></div>
+        </section>
+
+        <!-- แผ่นข้อความประจำฉาก -->
+        <section class="story-panel panel-lo" id="panel-1" aria-label="ประตูบ้าน">
+          <h2>ประตูบานนี้ เปิดรอคุณอยู่</h2>
+          <p>จากหน้าบ้านที่เงียบสงบ สู่พื้นที่ที่เป็นของครอบครัวคุณจริง ๆ</p>
+          <dl class="facts">
+            <div><dt>2018</dt><dd>เริ่มดูแลคนอยากมีบ้าน</dd></div>
+            <div><dt>1,200+</dt><dd>ครอบครัวที่ได้บ้านแล้ว</dd></div>
+          </dl>
+        </section>
+
+        <section class="story-panel panel-top" id="panel-2" aria-label="แนะนำบ้าน">
+          <h2>แล้วบ้านหลังนี้ก็เป็นของคุณ</h2>
+          <p>เลือกทำเล เลือกแบบบ้าน แล้วให้เราดูแลตั้งแต่ยื่นกู้จนถึงวันโอน</p>
+          <button class="note-button" type="button">
+            <span aria-hidden="true">↗</span>
+            <span>ดูบ้านทั้งหมด</span>
+          </button>
+        </section>
+
+        <section class="story-panel panel-lo" id="panel-3" aria-label="สวนกับห้องนั่งเล่น">
+          <h2>เปิดบานเลื่อน สวนก็คือห้องนั่งเล่น</h2>
+          <p>แสงเข้าเต็มบ้าน ลมผ่านตลอดวัน ในบ้านกับสวนต่อเนื่องเป็นผืนเดียวกัน</p>
+        </section>
+
+        <section class="story-panel panel-hi" id="panel-4" aria-label="ก้าวแรกในบ้าน">
+          <h2>ก้าวแรกในบ้าน</h2>
+          <p>ห้องนั่งเล่นเพดานสูง รับแดดเช้าเต็ม ๆ พื้นที่ที่ทุกคนมาเจอกันโดยไม่ต้องนัด</p>
+        </section>
+
+        <section class="story-panel panel-lo" id="panel-5" aria-label="มุมพักผ่อน">
+          <h2>มุมที่ไม่อยากลุกไปไหน</h2>
+          <p>โซฟา พรม แสงบ่าย และเพื่อนตัวโปรด — ความสบายที่วัดกันไม่ได้ด้วยตารางเมตร</p>
+        </section>
+
+        <section class="story-panel panel-hi" id="panel-6" aria-label="พื้นที่ว่าง">
+          <h2>พื้นที่ว่างก็มีค่า</h2>
+          <p>บางวันไม่ต้องทำอะไรเลยก็ได้ นั่นแหละคือเหตุผลที่ต้องมีบ้านเป็นของตัวเอง</p>
+        </section>
+
+        <section class="story-panel panel-hi" id="panel-7" aria-label="สรุป">
+          <h2>บ้านที่อยู่แล้วไม่อยากออกไปไหน</h2>
+          <p>ทำงาน พักผ่อน อยู่กับคนที่รัก — จบได้ในบ้านหลังเดียว</p>
+        </section>
+
+        <!-- สไลเดอร์จุดเด่น -->
+        <section class="sights-slider" aria-label="จุดเด่นของบ้าน">
+          <div class="sights-track">
+            <article class="sight-card" tabindex="0" role="button" aria-label="เปิดรายละเอียด ทำเล">
+              <span class="sight-kicker">ทำเล</span>
+              <img class="sight-pin" src="img/pin-1.jpg" alt="" />
+              <h3>ใกล้ทางด่วน</h3>
+              <p>เข้าเมืองสะดวก ใกล้ห้างและโรงเรียนในย่านเดียวกัน</p>
+            </article>
+            <article class="sight-card" tabindex="0" role="button" aria-label="เปิดรายละเอียด พื้นที่ใช้สอย">
+              <span class="sight-kicker">พื้นที่ใช้สอย</span>
+              <img class="sight-pin" src="img/pin-2.jpg" alt="" />
+              <h3>4 นอน 3 น้ำ</h3>
+              <p>ผังบ้านเปิดโล่ง ต่อเติมได้ ไม่ต้องรื้อโครงสร้างเดิม</p>
+            </article>
+            <article class="sight-card" tabindex="0" role="button" aria-label="เปิดรายละเอียด สวน">
+              <span class="sight-kicker">สวน</span>
+              <img class="sight-pin" src="img/pin-3.jpg" alt="" />
+              <h3>สวนหลังบ้าน</h3>
+              <p>สนามหญ้าจริง ปลูกต้นไม้ได้ ปล่อยหมาวิ่งได้เต็มที่</p>
+            </article>
+            <article class="sight-card" tabindex="0" role="button" aria-label="เปิดรายละเอียด สินเชื่อ">
+              <span class="sight-kicker">สินเชื่อ</span>
+              <img class="sight-pin" src="img/pin-1.jpg" alt="" />
+              <h3>ยื่นกู้ผ่าน 92%</h3>
+              <p>ทีมสินเชื่อช่วยเตรียมเอกสาร และเลือกธนาคารที่ให้วงเงินดีที่สุด</p>
+            </article>
+            <article class="sight-card" tabindex="0" role="button" aria-label="เปิดรายละเอียด บริการหลังการขาย">
+              <span class="sight-kicker">หลังการขาย</span>
+              <img class="sight-pin" src="img/pin-2.jpg" alt="" />
+              <h3>ดูแลถึงวันโอน</h3>
+              <p>ประเมินราคา นัดชมบ้าน จนถึงกรมที่ดิน จบครบในที่เดียว</p>
+            </article>
+          </div>
+        </section>
+
+        <div class="sights-controls" aria-label="ปุ่มเลื่อนสไลด์">
+          <button class="sight-nav sight-prev" type="button" aria-label="ก่อนหน้า">←</button>
+          <button class="sight-nav sight-next" type="button" aria-label="ถัดไป">→</button>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

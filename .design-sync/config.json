@@ -1,0 +1,24 @@
+{
+  "projectId": "9fd55d80-8e2c-4d4c-b323-4018f9185ee9",
+  "shape": "package",
+  "pkg": "@startupup/ds",
+  "globalName": "StartupUpDS",
+  "buildCmd": "npm run build",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "./dist/styles.css",
+  "docsDir": "docs",
+  "guidelinesGlob": [],
+  "overrides": {
+    "PropertyCardSkeleton": {
+      "cardMode": "column"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "Label": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@startupup/ds",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Startup Up design system - components extracted from the live site's styles",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "build": "npm run build:js && npm run build:css && npm run build:fonts",
+    "build:js": "tsup",
+    "build:css": "tailwindcss -i ./src/styles.css -o ./dist/styles.css",
+    "build:fonts": "node scripts/copy-fonts.mjs"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "dependencies": {
+    "lucide-react": "^1.8.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.4",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tailwindcss": "^4.2.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.0"
+  }
+}
