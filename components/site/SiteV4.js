@@ -920,26 +920,26 @@ const v4Css = `
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 40px;
 }
 .v4-footer h3 {
-  margin: 0 0 12px; font-size: 26px; font-weight: 300; letter-spacing: 0.2em;
+  margin: 0 0 14px; font-size: 30px; font-weight: 300; letter-spacing: 0.2em;
   font-family: var(--display); text-transform: uppercase;
 }
 .v4-footer h4 {
-  margin: 0 0 14px; font-size: 13px; font-weight: 500;
+  margin: 0 0 16px; font-size: 15px; font-weight: 500;
   letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.75;
 }
 .v4-footer p, .v4-footer span, .v4-footer a {
-  display: block; color: rgba(253, 241, 225, 0.78); font-size: 14px;
+  display: block; color: rgba(253, 241, 225, 0.78); font-size: 16px;
   line-height: 1.7; text-decoration: none; margin-bottom: 6px;
 }
 .v4-footer a:hover { color: #fff; text-decoration: underline; }
-.v4-footer .v4-phone { font-size: 18px; color: var(--paper); margin: 8px 0; }
+.v4-footer .v4-phone { font-size: 21px; color: var(--paper); margin: 10px 0; }
 .v4-social { display: flex; gap: 16px; margin-top: 4px; }
 .v4-social a { margin: 0; opacity: 0.8; transition: opacity 200ms ease, transform 200ms ease; }
 .v4-social a:hover { opacity: 1; transform: translateY(-2px); }
 .v4-footer-base {
   width: 100%; max-width: 1400px; margin: 0 auto; padding: 20px 28px 32px;
   border-top: 1px solid rgba(253, 241, 225, 0.18);
-  text-align: center; font-size: 12px; letter-spacing: 0.05em; opacity: 0.6;
+  text-align: center; font-size: 14px; letter-spacing: 0.05em; opacity: 0.65;
 }
 
 /* ---------- แถบโหมดแก้ไข ---------- */
