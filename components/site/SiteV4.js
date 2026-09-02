@@ -316,7 +316,7 @@ export default function SiteV4({ basePath = '/v4' }) {
                   value={navSearchText}
                   onChange={(e) => setNavSearchText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Escape') closeNavSearch(); }}
-                  placeholder="ชื่อโครงการ ทำเล หรือราคา"
+                  placeholder="ชื่อโครงการ ทำเล"
                   aria-label="ค้นหาบ้าน"
                   tabIndex={isNavSearchOpen ? 0 : -1}
                   disabled={isVisualEditMode}
