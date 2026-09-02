@@ -868,7 +868,11 @@ const v4Css = `
   margin-top: auto; color: var(--paper); position: relative; z-index: 30;
   background-color: #0b1f12;
   background-image:
-    linear-gradient(180deg, rgba(6, 20, 10, 0.93) 0%, rgba(6, 20, 10, 0.78) 42%, rgba(6, 20, 10, 0.9) 100%),
+    linear-gradient(180deg,
+      rgba(6, 20, 10, 0.72) 0%,
+      rgba(6, 20, 10, 0.64) 38%,
+      rgba(6, 20, 10, 0.88) 72%,
+      rgba(6, 20, 10, 0.94) 100%),
     url('/footer-bg.webp');
   background-position: center top;
   background-repeat: no-repeat;
@@ -882,8 +886,13 @@ const v4Css = `
   container-type: inline-size;
   background-size: 100% auto;
   min-height: calc(100cqw / 2.3801);
-  /* เนื้อหาไม่พอเต็มกล่องที่สูงขึ้นแล้ว จัดกึ่งกลางไว้ ไม่งั้นจะลอยอยู่ด้านบน */
-  display: flex; flex-direction: column; justify-content: center;
+  /**
+   * ดันเนื้อหาลงไปชิดก้น ไม่ใช่จัดกึ่งกลาง
+   * กล่องสูงกว่าตัวข้อความเกือบสามเท่า ถ้าจัดกึ่งกลางจะเหลือที่ว่างค้างใต้ข้อความเป็นท่อน
+   * ดันลงล่างแล้วที่ว่างไปกองอยู่ด้านบนแทน ซึ่งเป็นส่วนที่มีเต็นท์กับกลุ่มคนอยู่พอดี
+   * ม่านจึงจางที่หัวให้เห็นภาพ แล้วค่อยเข้มที่ก้นตรงที่ตัวหนังสือทับอยู่
+   */
+  display: flex; flex-direction: column; justify-content: flex-end;
 }
 /**
  * จอแคบกลับไปใช้ cover ตามเดิม
