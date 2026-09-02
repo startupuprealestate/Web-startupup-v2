@@ -42,6 +42,12 @@ const Youtube = ({ size = 22 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.42a2.78 2.78 0 0 0-1.94 2C1 8.13 1 12 1 12s0 3.87.54 5.58a2.78 2.78 0 0 0 1.94 2C5.12 20 12 20 12 20s6.88 0 8.6-.42a2.78 2.78 0 0 0 1.94-2C23 15.87 23 12 23 12s0-3.87-.54-5.58z" /><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" /></svg>
 );
 
+/**
+ * ระยะเลื่อนของจังหวะในฉากเปิด ต้องตรงกับ STATIONS ใน CinemaHero
+ * ถ้าไม่ตรง หน้าจะเลื่อนถึงแล้วยังขยับต่ออีกนิดเพราะโดนดูดเข้าสถานี
+ */
+const STATION_AT = { locations: 2050, featured: 3740 };
+
 const NAV_TABS = [
   { key: 'home', fallback: 'หน้าหลัก', field: 'navHome' },
   /* ทำเลมาก่อนบ้านทั้งหมด — ลูกค้าส่วนใหญ่เลือกจากทำเลก่อนแล้วค่อยดูว่ามีบ้านอะไร */
@@ -113,16 +119,14 @@ export default function SiteV4({ basePath = '/v4' }) {
    * ต้องรอให้ฉากถูก render ก่อนถึงจะวัด offsetTop ได้ จึงเช็คซ้ำเป็นจังหวะ
    * (ฉากยาวหลายพันพิกเซล การ์ดทำเลอยู่ช่วง 1480-2520 เลือก 2000 ซึ่งเป็นจุดที่โผล่เต็ม)
    */
-  /* ตรงกับสถานี 'locations' ใน CinemaHero — ถ้าไม่ตรง หน้าจะเลื่อนถึงแล้วยังขยับต่ออีกนิดให้เห็น */
-  const CAROUSEL_AT = 2050;
-  const goLocations = useCallback(() => {
+  const goStation = useCallback((at) => {
     if (isVisualEditMode) return;
     if (activeTab !== 'home' || selectedProperty) goTab('home');
     let tries = 0;
     const jump = () => {
       const stage = document.querySelector('.cinema-scroll');
       if (stage) {
-        window.scrollTo({ top: stage.offsetTop + CAROUSEL_AT, behavior: 'smooth' });
+        window.scrollTo({ top: stage.offsetTop + at, behavior: 'smooth' });
         return;
       }
       if (tries++ < 40) setTimeout(jump, 100);
@@ -130,9 +134,17 @@ export default function SiteV4({ basePath = '/v4' }) {
     setTimeout(jump, 60);
   }, [activeTab, goTab, isVisualEditMode, selectedProperty]);
 
-  /* ทำเลมีหน้าของตัวเองแล้ว ไม่ต้องเด้งกลับไปที่การ์ดในฉากเปิดอีก
-     goLocations ยังเก็บไว้ให้ปุ่มในฉากเปิดเรียกใช้ */
-  const onNavTab = useCallback((key) => { goTab(key); }, [goTab]);
+  /**
+   * เมนูทำเลกับบ้านทั้งหมดพาไปหาจังหวะในฉากเปิด ไม่ใช่เปิดหน้าแยก
+   *   ทำเล        -> แผงค้นหาบ้านที่ใช่สำหรับคุณ พร้อมการ์ดทำเล
+   *   บ้านทั้งหมด  -> แผงบ้านเด่นที่เราคัดสรร
+   * แท็บ location กับ all ยังอยู่ เพราะปุ่มอื่นในหน้ายังลิงก์เข้าไปได้
+   */
+  const onNavTab = useCallback((key) => {
+    if (key === 'location') { goStation(STATION_AT.locations); return; }
+    if (key === 'all') { goStation(STATION_AT.featured); return; }
+    goTab(key);
+  }, [goStation, goTab]);
   const label = (field, fallback) => visualContent?.[field] || DEFAULT_VISUAL_CONTENT[field] || fallback;
 
   return (

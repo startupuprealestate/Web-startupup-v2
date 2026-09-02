@@ -1197,14 +1197,18 @@ const cinemaCss = `
   margin-top: 0.28em;
   font-size: 0.34em;          /* อิงจากขนาดบรรทัดบน จึงย่อขยายตามกันทุกจอ */
   letter-spacing: 0.46em;
-  opacity: 0.92;
+  /* ห้ามหรี่ opacity ที่นี่ ตัวหนังสือจะขาวไม่เท่าบรรทัดบนทันที
+     ถ้าอยากให้ขีดจางกว่าตัวหนังสือ ให้ไปหรี่ที่ ::after อย่างเดียว */
 }
-.cinema-scroll .hero-title::after {
+/* ขีดยาวเท่าบรรทัด "Real Estate" ไม่ใช่เท่าชื่อบริษัท
+   วางไว้ที่บรรทัดล่างแทนที่จะเป็นตัว h1 เพราะ h1 เป็น flex คอลัมน์
+   ความกว้างจึงเท่าบรรทัดที่ยาวที่สุด ซึ่งยาวเกินไป */
+.cinema-scroll .hero-title-sub::after {
   content: "";
   display: block;
   width: 100%;
   height: 1px;
-  margin-top: 0.3em;
+  margin-top: 0.44em;
   background: currentColor;
   opacity: 0.72;
 }
