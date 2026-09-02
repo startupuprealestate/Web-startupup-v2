@@ -267,7 +267,15 @@ export default function SalePageV4({
       `${thaiDate(pickDate)} เวลา ${hour}:${minute} น.`,
       `https://www.startupup-real-estate.com${getPropertySharePath(property)}`,
     ].filter(Boolean).join('\n');
-    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    /**
+     * ต้องมี noreferrer ไม่ใช่แค่ noopener
+     *
+     * เว็บตั้ง Referrer-Policy เป็น strict-origin-when-cross-origin ไว้
+     * เวลาเปิดลิงก์ข้ามโดเมน เบราว์เซอร์จึงส่งแค่ชื่อโดเมนไปให้ปลายทาง
+     * LINE เอาค่านั้นมาต่อท้ายข้อความให้เอง กลายเป็นลิงก์หน้าหลักโผล่มาอีกอัน
+     * ปิดการส่ง referrer ทิ้ง LINE ก็ไม่มีอะไรให้ต่อท้าย เหลือลิงก์บ้านหลังเดียว
+     */
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
   }, [property, houseAndSoi, pickDate, hour, minute, thaiDate, trackContact]);
 
   // ลูกศรซ้าย-ขวาบนคีย์บอร์ดเลื่อนรูปได้
