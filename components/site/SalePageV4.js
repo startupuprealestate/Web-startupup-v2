@@ -56,6 +56,17 @@ const writeSaved = (list) => {
   try { localStorage.setItem(SAVED_KEY, JSON.stringify(list)); } catch (e) { /* โหมดส่วนตัวเขียนไม่ได้ ไม่เป็นไร */ }
 };
 
+/**
+ * ส่ง event เข้า GA4 ที่ติดตั้งอยู่แล้วใน pages/_app.js (G-989XMRNC6Y)
+ * นับอย่างเดียว ไม่เก็บอะไรที่ระบุตัวบุคคล
+ * ห่อ try ไว้เพราะผู้ใช้บางคนมีตัวบล็อกโฆษณาที่ทำให้ gtag ไม่มีอยู่จริง
+ * ถ้าไม่ห่อ ปุ่มจะกดไม่ทำงานเลยเมื่อสคริปต์ถูกบล็อก
+ */
+const track = (name, params) => {
+  if (typeof window === 'undefined') return;
+  try { window.gtag?.('event', name, params); } catch (e) { /* ไม่มี gtag ก็ปล่อยผ่าน */ }
+};
+
 const baht = (v) => Number(String(v || 0).replace(/,/g, '')).toLocaleString();
 
 /** แปลงข้อความ highlights ที่เก็บ "-" นำหน้า ให้เป็นย่อหน้ากับรายการจุดกลม */
@@ -102,6 +113,7 @@ export default function SalePageV4({
   const [at, setAt] = useState(0);
   const [wipe, setWipe] = useState(null);       // { src, dir } ระหว่างเล่นจังหวะกวาด
   const [videoOn, setVideoOn] = useState(false);
+  const [heroReady, setHeroReady] = useState(false);
   const [saved, setSaved] = useState([]);
   const [toast, setToast] = useState('');
   const [bookOpen, setBookOpen] = useState(false);
@@ -132,7 +144,7 @@ export default function SalePageV4({
   useEffect(() => { setSaved(readSaved()); }, []);
 
   useEffect(() => {
-    setAt(0); setWipe(null); setVideoOn(false);
+    setAt(0); setWipe(null); setVideoOn(false); setHeroReady(false);
     setBookOpen(false); setPickDate(null); setHour(''); setMinute('');
   }, [property?.id]);
 
@@ -239,7 +251,15 @@ export default function SalePageV4({
 
   const bookReady = Boolean(pickDate && hour !== '' && minute !== '');
 
+  const trackContact = useCallback((name) => {
+    track(name, {
+      property_id: property?.id || '',
+      property_name: property?.project_name || '',
+    });
+  }, [property]);
+
   const sendBooking = useCallback(() => {
+    trackContact('booking_line_send');
     const msg = [
       'สนใจนัดเข้าชมบ้าน',
       property?.project_name || '',
@@ -248,7 +268,7 @@ export default function SalePageV4({
       `https://www.startupup-real-estate.com${getPropertySharePath(property)}`,
     ].filter(Boolean).join('\n');
     window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener');
-  }, [property, houseAndSoi, pickDate, hour, minute, thaiDate]);
+  }, [property, houseAndSoi, pickDate, hour, minute, thaiDate, trackContact]);
 
   // ลูกศรซ้าย-ขวาบนคีย์บอร์ดเลื่อนรูปได้
   useEffect(() => {
@@ -273,7 +293,7 @@ export default function SalePageV4({
       <div
         className="sp4-bg"
         aria-hidden="true"
-        style={{ backgroundImage: `url(${getOptimizedImg(images[0], 1200)})` }}
+        style={{ backgroundImage: `url(${getOptimizedImg(images[0], 1400)})` }}
       />
 
       {/* ── แถวควบคุมบนสุด ── */}
@@ -340,6 +360,7 @@ export default function SalePageV4({
       {/* ── ภาพหลัก แถบเต็มความกว้าง รูปไม่ถูกครอบ ── */}
       <figure className="sp4-stage">
         <div className="sp4-shot">
+          {!heroReady && <div className="sp4-skel sp4-skel-hero" aria-hidden="true" />}
           <SmartImage
             src={getOptimizedImg(images[at], 1400)}
             alt={property.project_name}
@@ -348,6 +369,9 @@ export default function SalePageV4({
             priority
             decoding="async"
             className="sp4-hero"
+            style={heroReady ? undefined : { visibility: 'hidden' }}
+            onLoad={() => setHeroReady(true)}
+            onError={() => setHeroReady(true)}
             onClick={() => openLightbox && openLightbox(images, at)}
           />
 
@@ -506,10 +530,19 @@ export default function SalePageV4({
           <div className="sp4-card">
             <h2>สนใจติดต่อ</h2>
             <div className="sp4-acts">
-              <a className={`sp4-act call${isEditMode ? ' is-off' : ''}`} href={isEditMode ? '#' : `tel:${companyInfo?.phone}`}>
+              <a
+                className={`sp4-act call${isEditMode ? ' is-off' : ''}`}
+                href={isEditMode ? '#' : `tel:${companyInfo?.phone}`}
+                onClick={() => trackContact('contact_call')}
+              >
                 <Phone size={16} /> {companyInfo?.phone}
               </a>
-              <a className={`sp4-act line${isEditMode ? ' is-off' : ''}`} href={isEditMode ? '#' : companyInfo?.line} target="_blank" rel="noopener noreferrer">
+              <a
+                className={`sp4-act line${isEditMode ? ' is-off' : ''}`}
+                href={isEditMode ? '#' : companyInfo?.line}
+                target="_blank" rel="noopener noreferrer"
+                onClick={() => trackContact('contact_line')}
+              >
                 <img src="/brand/line.png" alt="" width="18" height="18" className="sp4-lineico" /> ทักไลน์
               </a>
               <button type="button" className="sp4-act line" aria-expanded={bookOpen} onClick={() => setBookOpen((v) => !v)}>
@@ -666,19 +699,20 @@ const css = `
    z-index -1 คู่กับ isolation ที่ .sp4 เพื่อไม่ให้หลุดไปอยู่หลังทั้งหน้า */
 .sp4-bg {
   position: absolute; inset: -8%; z-index: -1; pointer-events: none;
-  background-size: cover; background-position: center;
-  filter: blur(30px) saturate(1.2);
-  opacity: .18;
-  animation: sp4bg 48s ease-in-out infinite alternate;
+  background-size: cover; background-position: center top;
+  animation: sp4bg 60s ease-in-out infinite alternate;
 }
+/* ผ้าคลุมสีขาวไล่ลง คุมความจางที่ตรงนี้ที่เดียว
+   ด้านบนโปร่งพอให้เห็นบ้าน ด้านล่างทึบเพื่อให้เนื้อหาอ่านสบาย */
 .sp4-bg::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(to bottom,
-    rgba(248,250,252,.5), rgba(248,250,252,.86) 46%, var(--paper) 78%);
+    rgba(248,250,252,.50) 0%, rgba(248,250,252,.78) 30%,
+    rgba(248,250,252,.94) 56%, var(--paper) 78%);
 }
 @keyframes sp4bg {
-  from { transform: scale(1.04); }
-  to   { transform: scale(1.14) translate3d(-1.6%, -1.2%, 0); }
+  from { transform: scale(1.02); }
+  to   { transform: scale(1.08) translate3d(-1%, -0.8%, 0); }
 }
 .sp4 * { box-sizing: border-box; }
 .sp4 :focus-visible { outline: 2px solid var(--forest); outline-offset: 3px; border-radius: var(--r1); }
@@ -761,6 +795,22 @@ const css = `
 }
 .sp4-nav:hover { background: #fff; transform: translateY(-50%) scale(1.06); }
 .sp4-nav.prev { left: 14px; } .sp4-nav.next { right: 14px; }
+
+/* ── โครงร่างระหว่างโหลด ──
+   ใช้ background-position ขยับแทน transform เพราะต้องกวาดแถบไล่สี
+   ไม่ได้ย้ายทั้งกล่อง จึงไม่ทำให้เกิด layout shift */
+.sp4-skel {
+  background: linear-gradient(100deg, #eef1f5 30%, #f7f9fb 48%, #eef1f5 66%);
+  background-size: 320% 100%;
+  animation: sp4shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--r1);
+}
+@keyframes sp4shimmer { from { background-position: 130% 0; } to { background-position: -30% 0; } }
+.sp4-skel-hero {
+  position: absolute; inset: 0; z-index: 2; border-radius: 0;
+}
+/* กันไม่ให้กรอบรูปยุบเหลือศูนย์ตอนยังไม่มีภาพ ไม่งั้นหน้าจะกระตุกตอนโหลดเสร็จ */
+.sp4-shot { min-height: clamp(220px, 42vh, 520px); min-width: min(100%, 900px); }
 
 .sp4-strip {
   max-width: var(--shell); margin: 0 auto; padding: var(--s2) var(--gutter) 0;
@@ -952,7 +1002,10 @@ const css = `
 
 .sp4-calc { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); }
 .sp4-calc > h3 { margin: 0 0 var(--s2); font-size: 16px; font-weight: 500; color: var(--ink-faint); }
-/* CalculatorSection ออกแบบมาสำหรับพื้นขาวอยู่แล้ว การ์ดเป็นขาว จึงไม่ต้อง override สีเลย */
+/* CalculatorSection ออกแบบมาสำหรับพื้นขาวอยู่แล้ว แทบไม่ต้อง override
+   ยกเว้นช่อง "ระยะเวลา (ปี)" ที่เป็น bg-gray-50 แล้วออกมาขุ่นบนการ์ดขาว */
+.sp4-calc .input-modern.bg-gray-50,
+.sp4-calc .bg-gray-50 { background-color: #fff !important; border: 1px solid var(--line-firm) !important; }
 
 .sp4-related { max-width: var(--shell); margin: 0 auto; padding: var(--s6) var(--gutter); }
 .sp4-related-head {
@@ -1006,7 +1059,7 @@ const css = `
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sp4-bg { animation: none; }
+  .sp4-bg, .sp4-skel { animation: none; }
   .sp4-layer img, .sp4-dial .sun-orbit, .sp4-dial .needle,
   .sp4-pcard-img img,   .sp4-nav:hover { transform: translateY(-50%); }
   .sp4-back:hover, .sp4-act:hover, .sp4-mapbtn:hover, .sp4-strip button:hover,
