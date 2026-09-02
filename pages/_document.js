@@ -16,8 +16,8 @@ export default function Document() {
           มันอาจไปหยิบของที่เดาเอาเองหรือไม่เจอเลย
         */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/png" href="/favicon-new.png" sizes="512x512" />
-        <link rel="apple-touch-icon" href="/favicon-new.png" />
+        <link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
       </Head>
       <body>
         <noscript>

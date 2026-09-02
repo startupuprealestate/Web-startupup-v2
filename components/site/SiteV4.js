@@ -185,7 +185,7 @@ export default function SiteV4({ basePath = '/v4' }) {
         <meta property="og:image" content={seoMeta.image} />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="theme-color" content="#0b1f12" />
-        <link rel="icon" type="image/png" href="/favicon-new.png" />
+        <link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(structuredData) }} />
       </Head>
 

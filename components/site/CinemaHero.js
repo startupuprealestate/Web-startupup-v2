@@ -1197,7 +1197,7 @@ const cinemaCss = `
 .cinema-scroll .hero-title {
   max-width: 100%; margin: 0; color: #fdf1e1;
   font-family: Prompt, system-ui, sans-serif;
-  font-size: 6.6rem; font-weight: 200; line-height: 1.06;
+  font-size: 5.8rem; font-weight: 200; line-height: 1.06;
   text-transform: uppercase;
   text-align: center; text-shadow: 0 22px 60px rgba(0,0,0,0.42);
   display: flex; flex-direction: column; align-items: center;
@@ -1250,7 +1250,7 @@ const cinemaCss = `
 }
 .cinema-scroll .intro-copy p {
   margin: 0 auto; max-width: 600px; color: #fdf1e1;
-  font-size: 1.18rem; font-weight: 500; line-height: 1.5; text-wrap: balance;
+  font-size: 1.06rem; font-weight: 500; line-height: 1.5; text-wrap: balance;
   text-shadow: 0 2px 18px rgba(0,0,0,0.55);
 }
 .cinema-scroll .hero-tags {
@@ -1259,8 +1259,8 @@ const cinemaCss = `
 }
 .cinema-scroll .hero-tags span {
   display: inline-flex; align-items: center; justify-content: center;
-  min-height: 42px; padding: 0 25px; color: #111411; border-radius: 999px;
-  background: #fdf1e1; font-size: 0.98rem; font-weight: 500;
+  min-height: 38px; padding: 0 21px; color: #111411; border-radius: 999px;
+  background: #fdf1e1; font-size: 0.9rem; font-weight: 500;
   box-shadow: 0 12px 30px rgba(0,0,0,0.22);
 }
 .cinema-scroll .intro-lead { display: block; }
@@ -1272,7 +1272,7 @@ const cinemaCss = `
 }
 .cinema-scroll .hero-stats .hero-stat {
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; min-width: 168px; padding: 24px 20px;
+  gap: 5px; min-width: 150px; padding: 20px 18px;
   border-radius: 20px; font: inherit; color: #fdf1e1;
   background: rgba(253, 241, 225, 0.13);
   border: 1px solid rgba(253, 241, 225, 0.3);
@@ -1280,9 +1280,9 @@ const cinemaCss = `
 }
 .cinema-scroll .hero-stats strong {
   font-family: Prompt, system-ui, sans-serif;
-  font-size: 2.5rem; font-weight: 600; line-height: 1.1;
+  font-size: 2.2rem; font-weight: 600; line-height: 1.1;
 }
-.cinema-scroll .hero-stats span { font-size: 0.98rem; opacity: 0.88; }
+.cinema-scroll .hero-stats span { font-size: 0.9rem; opacity: 0.88; }
 
 /* แถบบอกว่าเลื่อนฉากมาถึงไหน */
 .cinema-scroll .cine-progress {
@@ -1441,11 +1441,11 @@ const cinemaCss = `
   mask-image: linear-gradient(90deg, transparent 0, #000 96px, #000 calc(100% - 96px), transparent 100%);
 }
 @media (max-width: 1500px) {
-  .cinema-scroll .hero-title { font-size: 5.4rem; }
+  .cinema-scroll .hero-title { font-size: 4.8rem; }
   .cinema-scroll .story-panel h2 { font-size: 3rem; }
 }
 @media (max-width: 1100px) {
-  .cinema-scroll .hero-title { font-size: 3.8rem; letter-spacing: 0.16em; }
+  .cinema-scroll .hero-title { font-size: 3.4rem; letter-spacing: 0.16em; }
   .cinema-scroll .story-panel h2 { font-size: 2.4rem; }
 }
 @media (max-width: 640px) {
@@ -1456,40 +1456,11 @@ const cinemaCss = `
   }
   .cinema-scroll .stage { min-height: 640px; }
   .cinema-scroll .scene { filter: none; will-change: transform, opacity; }
-  .cinema-scroll .hero-title { font-size: 1.9rem; letter-spacing: 0.12em; }
+  .cinema-scroll .hero-title { font-size: 1.7rem; letter-spacing: 0.12em; }
   .cinema-scroll .intro-copy p, .cinema-scroll .story-panel p { font-size: 1rem; }
   .cinema-scroll .intro-lead { display: block; }
 
-/* ตัวเลขเล่าแบรนด์ โชว์ตั้งแต่หน้าจอแรก */
-.cinema-scroll .hero-stats {
-  display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center;
-  gap: 12px; margin-top: 24px;
-}
-.cinema-scroll .hero-stats .hero-stat {
-  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; min-width: 168px; padding: 24px 20px;
-  border-radius: 20px; font: inherit; color: #fdf1e1;
-  background: rgba(253, 241, 225, 0.13);
-  border: 1px solid rgba(253, 241, 225, 0.3);
-  backdrop-filter: blur(6px);
-}
-.cinema-scroll .hero-stats strong {
-  font-family: Prompt, system-ui, sans-serif;
-  font-size: 2.5rem; font-weight: 600; line-height: 1.1;
-}
-.cinema-scroll .hero-stats span { font-size: 0.98rem; opacity: 0.88; }
-
-/* แถบบอกว่าเลื่อนฉากมาถึงไหน */
-.cinema-scroll .cine-progress {
-  position: absolute; z-index: 40; left: 0; right: 0; bottom: 0; height: 3px;
-  background: rgba(253, 241, 225, 0.16); pointer-events: none;
-}
-.cinema-scroll .cine-progress i {
-  display: block; height: 100%; width: 100%; transform-origin: 0 50%;
-  transform: scaleX(0); background: #fdf1e1;
-}
-
-.cinema-scroll .scroll-hint { margin-top: 20px; }
+  .cinema-scroll .scroll-hint { margin-top: 20px; }
   .cinema-scroll .hero-tags { gap: 8px; }
   .cinema-scroll .hero-tags span { min-height: 38px; padding: 0 16px; font-size: 0.88rem; }
   .cinema-scroll .story-panel { top: 44%; }

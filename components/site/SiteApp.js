@@ -4228,8 +4228,8 @@ export default function App() {
         <meta name="twitter:image" content={seoMeta.image} />
 
         <meta name="theme-color" content="#0b3d1b" />
-        <link rel="icon" type="image/png" href="/favicon-new.png" />
-        <link rel="apple-touch-icon" href="/favicon-new.png" />
+        <link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: safeJsonLd(structuredData) }}
