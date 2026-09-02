@@ -538,7 +538,7 @@ export default function SiteV4({ basePath = '/v4' }) {
               <h3>{companyInfo?.name || 'STARTUP UP'}</h3>
               <p>{companyInfo?.description || 'จุดเริ่มต้นของคนอยากมีบ้าน'}</p>
             </div>
-            <div>
+            <div className="v4-foot-contact">
               <h4>{label('contactTitle', 'ติดต่อเรา')}</h4>
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(companyInfo?.address || '')}`}
@@ -937,6 +937,14 @@ const v4Css = `
 }
 .v4-footer a:hover { color: #fff; text-decoration: underline; }
 .v4-footer .v4-phone { font-size: 25px; color: var(--paper); margin: 12px 0; }
+/**
+ * ช่องติดต่อชิดซ้าย ไม่ตามคอลัมน์อื่นที่จัดกึ่งกลาง
+ * ที่อยู่ยาวจนตกบรรทัด ถ้าจัดกึ่งกลางจะได้ขอบซ้ายเป็นฟันปลา อ่านสะดุด
+ * ก้อนทั้งก้อนยังถูกจัดกึ่งกลางในคอลัมน์อยู่ กว้างเท่าบรรทัดที่ยาวที่สุดเท่านั้น
+ * จึงไม่ลอยไปติดขอบคอลัมน์จนดูหลุดจากอีกสองช่อง
+ */
+.v4-foot-contact { text-align: left; width: fit-content; margin: 0 auto; }
+.v4-foot-contact h4 { text-indent: 0; }
 .v4-social { display: flex; justify-content: center; gap: 18px; margin-top: 6px; }
 .v4-social a { margin: 0; opacity: 0.8; transition: opacity 200ms ease, transform 200ms ease; }
 .v4-social a:hover { opacity: 1; transform: translateY(-2px); }
