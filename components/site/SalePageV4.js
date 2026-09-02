@@ -775,7 +775,14 @@ const css = `
   border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
   display: flex; justify-content: center;
 }
-.sp4-shot { position: relative; display: flex; max-width: 100%; }
+/**
+ * overflow: hidden ขาดไม่ได้
+ * ป้าย SOLD OUT วางแบบเลยขอบขวาออกไป 48px แล้วหมุน 38 องศา
+ * ตั้งใจให้โดนขลิบที่มุมภาพจนกลายเป็นแถบเฉียงพาดมุม
+ * ถ้ากล่องไม่ขลิบ ป้ายจะโผล่พ้นภาพขึ้นไปลอยทับแถบเมนูด้านบน
+ * (การ์ดบ้านใบเล็กขลิบอยู่แล้ว จึงไม่เคยมีปัญหานี้)
+ */
+.sp4-shot { position: relative; display: flex; max-width: 100%; overflow: hidden; }
 .sp4-shot .sp4-hero {
   width: auto; max-width: 100%; max-height: 74vh; object-fit: contain;
   display: block; cursor: zoom-in;
