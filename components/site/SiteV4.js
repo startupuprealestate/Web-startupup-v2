@@ -15,7 +15,7 @@
 import Head from 'next/head';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Settings, Search, Menu, X, Loader, Save, Layout, Type,
+  Settings, Search, CircleUserRound, Menu, X, Loader, Save, Layout, Type,
   ChevronLeft, ChevronRight, MessageCircle, Video,
 } from 'lucide-react';
 
@@ -328,10 +328,15 @@ export default function SiteV4({ basePath = '/v4' }) {
             </nav>
 
             <div className="v4-nav-actions">
-              {/* ไม่มีปุ่ม Admin Login ให้ลูกค้าเห็นแล้ว คนที่ล็อกอินผ่านแล้วเท่านั้นถึงเห็นปุ่มนี้ */}
-              {userRole && (
+              {userRole ? (
                 <button type="button" className="v4-admin-btn" disabled={isVisualEditMode} onClick={() => setShowAdminPanel(true)}>
                   <Settings size={14} /> ระบบจัดการ
+                </button>
+              ) : (
+                /* ไอคอนบัญชีผู้ใช้ล้วน ๆ ไม่มีคำว่า Admin Login ให้สะดุดตาลูกค้า
+                   วางไว้ใน v4-nav-actions ซึ่งไม่ถูกซ่อนบนจอเล็ก จึงกดได้ทุกขนาดจอ */
+                <button type="button" className="v4-user-btn" aria-label="เข้าสู่ระบบผู้ดูแล" title="เข้าสู่ระบบผู้ดูแล" onClick={() => setShowLoginModal(true)}>
+                  <CircleUserRound size={22} />
                 </button>
               )}
               <button type="button" className="v4-burger" aria-label="เมนู" onClick={() => setIsMenuOpen(v => !v)}>
@@ -739,6 +744,15 @@ const v4Css = `
 .v4-admin-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .v4-nav.is-ghost .v4-admin-btn { border-color: rgba(253,241,225,0.7); color: #fdf1e1; }
 .v4-nav.is-ghost .v4-admin-btn:hover { background: #fdf1e1; color: var(--brand); }
+
+.v4-user-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: none; padding: 4px; cursor: pointer;
+  color: rgba(17, 20, 17, 0.45); transition: color 220ms ease;
+}
+.v4-user-btn:hover { color: var(--brand); }
+.v4-nav.is-ghost .v4-user-btn { color: rgba(253, 241, 225, 0.72); }
+.v4-nav.is-ghost .v4-user-btn:hover { color: #fdf1e1; }
 
 .v4-burger { display: none; border: 0; background: none; cursor: pointer; color: inherit; padding: 6px; }
 .v4-nav.is-ghost .v4-burger { color: #fdf1e1; }
