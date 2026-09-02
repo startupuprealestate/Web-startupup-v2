@@ -711,6 +711,13 @@ export default function CinemaHero({
 
     const armSnap = () => {
       if (snapTimer) clearTimeout(snapTimer);
+      /**
+       * จอสัมผัสปล่อยให้ CSS scroll-snap จัดการแทน
+       * เพราะ JS ต้องรอให้โมเมนตัมหยุดสนิทก่อนถึงจะเริ่มดูด แต่การสะบัดนิ้วแรง ๆ
+       * บน iOS ไหลไปได้เป็นพันพิกเซล พอหยุดก็เลย SNAP_CATCH ไปแล้ว ไม่มีอะไรดึงกลับ
+       * ส่วนเบราว์เซอร์รู้จุดจอดตั้งแต่ตอนกำลังหน่วงความเร็ว จึงจอดตรงได้
+       */
+      if (coarse) return;
       if (editModeRef.current || reduceMotion.matches || !userInput) return;
       if (performance.now() < snapSuppressUntil) return;
       snapTimer = setTimeout(() => {
@@ -889,6 +896,15 @@ export default function CinemaHero({
       <style>{cinemaCss}</style>
 
       <section className={`cinema-scroll${isEditMode ? ' is-editing' : ''}`} ref={sectionRef} aria-label={`เรื่องเล่าบ้าน ${companyName} แบบเลื่อนหน้าจอ`}>
+        {/**
+          * จุดจอดสำหรับ CSS scroll-snap — ใช้เฉพาะจอสัมผัส
+          * วางที่ระยะ scroll ของแต่ละสถานีพอดี พอ scroll-snap-align: start
+          * เบราว์เซอร์จะจัดให้ขอบบนจอตรงกับจุดนี้ = ระยะเลื่อนเท่ากับ at พอดี
+          */}
+        {STATIONS.map((st) => (
+          <i key={st.key} className="cine-snap" style={{ top: `${st.at}px` }} aria-hidden="true" />
+        ))}
+
         <div className="stage">
           <div className="world" ref={worldRef}>
 
@@ -1064,6 +1080,25 @@ export default function CinemaHero({
 }
 
 const cinemaCss = `
+/* จุดจอดของ scroll-snap สูงศูนย์ มองไม่เห็น ไม่กินพื้นที่ ไม่รับการกด */
+.cinema-scroll .cine-snap {
+  position: absolute; left: 0; width: 1px; height: 1px;
+  pointer-events: none; visibility: hidden;
+}
+/**
+ * เปิด scroll-snap เฉพาะเครื่องที่ไม่มีเมาส์
+ * ใช้ proximity ไม่ใช่ mandatory — จอดให้เมื่อหยุดใกล้จุดเท่านั้น
+ * ถ้าตั้งใจสะบัดยาวผ่านไปเลย ก็ยังไปได้ ไม่ถูกบังคับให้จอดทุกจุด
+ * หน้าอื่นไม่มีจุดจอด จึงเลื่อนอิสระเหมือนเดิม
+ */
+@media (hover: none) {
+  html { scroll-snap-type: y proximity; }
+  .cinema-scroll .cine-snap { scroll-snap-align: start; }
+}
+@media (hover: none) and (prefers-reduced-motion: reduce) {
+  html { scroll-snap-type: none; }
+}
+
 .cinema-scroll {
   --shade-top-alpha: 0; --shade-mid-alpha: 0; --shade-bottom-alpha: 0;
   --blur-tint: 7, 18, 11;
