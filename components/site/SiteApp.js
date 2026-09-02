@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Home, MapPin, Bed, Bath, Car, Maximize, Phone, MessageCircle, Menu, X, Plus, Trash2, ShieldCheck, CheckCircle, Calculator, Users, FileText, Settings, Edit, Save, Image as ImageIcon, Layout, ChevronLeft, ChevronRight, ChevronDown, Upload, Briefcase, XCircle, Tag, Loader, Video, Check, Copy, Calendar, FolderPlus, Map as MapIcon, Search, AlertTriangle, AlertCircle, Star, ClipboardCheck, Type, LayoutTemplate, Compass } from 'lucide-react';
+import { Home, MapPin, Bed, Bath, Car, Maximize, Phone, MessageCircle, Menu, X, Plus, Trash2, ShieldCheck, CheckCircle, Calculator, Users, FileText, Settings, Edit, Save, Image as ImageIcon, Layout, ChevronLeft, ChevronRight, ChevronDown, Upload, Briefcase, XCircle, Tag, Loader, Video, Check, Copy, Calendar, FolderPlus, Map as MapIcon, Search, AlertTriangle, AlertCircle, Star, ClipboardCheck, Type, LayoutTemplate, Compass, SlidersHorizontal } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -1759,17 +1759,32 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
+  /* ตัวกรองแบบติ๊กหลายช่อง — เลือกทำเลและประเภทบ้านพร้อมกันได้
+     เก็บเป็น array เพราะต้องใส่ใน dependency ของ useEffect ซึ่ง Set เทียบไม่ได้ */
+  const [pickedAreas, setPickedAreas] = useState([]);
+  const [pickedCats, setPickedCats] = useState([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = useRef(null);
+  const toggleIn = (list, setList, value) => {
+    setList(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
+  };
+  const areaOptions = visibleLocations(normalizeLocations(visualContent?.locations)).map((l) => l.area);
+  const filterCount = pickedAreas.length + pickedCats.length;
+
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
       setCurrentPage(1);
-  }, [searchParams, sortOption]);
+  }, [searchParams, sortOption, pickedAreas, pickedCats]);
 
   useEffect(() => {
       function handleClickOutside(event) {
           if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
               setIsDropdownOpen(false);
+          }
+          if (filterRef.current && !filterRef.current.contains(event.target)) {
+              setIsFilterOpen(false);
           }
       }
       document.addEventListener("mousedown", handleClickOutside);
@@ -1804,6 +1819,18 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
           return propString.includes(keyword);
       });
       title = `ผลการค้นหา: "${searchParams.value}"`;
+  }
+
+  /* ตัวกรองทับผลของหัวข้อหน้าอีกชั้น
+     ติ๊กหลายอันในกลุ่มเดียวกันคือ "อย่างใดอย่างหนึ่ง" ข้ามกลุ่มคือ "ต้องเข้าทั้งสองกลุ่ม"
+     ทาวน์เฮาส์ใช้ includes เพราะในสต๊อกมีทั้งหลังริมและชั้นเดียวที่ขึ้นต้นเหมือนกัน */
+  if (pickedAreas.length > 0) {
+      displayProps = displayProps.filter(p => pickedAreas.some(a => matchesMainArea(p, a)));
+  }
+  if (pickedCats.length > 0) {
+      displayProps = displayProps.filter(p => pickedCats.some(c => (
+          c === 'ทาวน์เฮาส์' ? p.category?.includes('ทาวน์เฮาส์') : p.category === c
+      )));
   }
 
   let sortedProps = [...displayProps];
@@ -1854,6 +1881,45 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
           <h2 className="text-2xl font-light text-brand-green">{title} <span className="text-sm text-gray-400 ml-2">({displayProps.length} รายการ)</span></h2>
           
+          <div className="flex items-center gap-2 flex-wrap">
+          {/* ตัวกรอง : ติ๊กเลือกทำเลและประเภทบ้านพร้อมกันได้ */}
+          <div className="relative" ref={filterRef}>
+              <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={`flex items-center gap-2 text-sm px-5 py-2.5 rounded-full border transition shadow-sm font-light ${filterCount > 0 ? 'bg-brand-green text-white border-brand-green' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-green hover:text-brand-green'}`}>
+                  <SlidersHorizontal size={16} />
+                  ตัวกรอง{filterCount > 0 ? <span className="font-medium">({filterCount})</span> : null}
+                  <ChevronDown size={16} className={`transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isFilterOpen && (
+                  <div className="absolute right-0 mt-2 w-[290px] max-h-[70vh] overflow-y-auto bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] border border-gray-100 p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-brand-green">ทำเล</span>
+                          {filterCount > 0 && (
+                              <button onClick={() => { setPickedAreas([]); setPickedCats([]); }} className="text-xs text-gray-400 hover:text-brand-green transition">ล้างทั้งหมด</button>
+                          )}
+                      </div>
+                      <div className="grid grid-cols-1 gap-1 mb-4">
+                          {areaOptions.map((area) => (
+                              <label key={area} className="flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-gray-600 hover:bg-brand-light cursor-pointer transition">
+                                  <input type="checkbox" className="accent-[#0b3d1b] w-4 h-4" checked={pickedAreas.includes(area)} onChange={() => toggleIn(pickedAreas, setPickedAreas, area)} />
+                                  <span className={pickedAreas.includes(area) ? 'text-brand-green font-medium' : ''}>{area}</span>
+                              </label>
+                          ))}
+                      </div>
+
+                      <div className="text-sm font-medium text-brand-green mb-3 pt-3 border-t border-gray-100">ประเภทบ้าน</div>
+                      <div className="grid grid-cols-1 gap-1">
+                          {CATEGORIES.map((cat) => (
+                              <label key={cat} className="flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-gray-600 hover:bg-brand-light cursor-pointer transition">
+                                  <input type="checkbox" className="accent-[#0b3d1b] w-4 h-4" checked={pickedCats.includes(cat)} onChange={() => toggleIn(pickedCats, setPickedCats, cat)} />
+                                  <span className={pickedCats.includes(cat) ? 'text-brand-green font-medium' : ''}>{cat}</span>
+                              </label>
+                          ))}
+                      </div>
+                  </div>
+              )}
+          </div>
+
           {displayProps.length > 0 && (
               <div className="relative" ref={dropdownRef}>
                   <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-2 text-sm text-gray-600 bg-white border border-gray-200 px-5 py-2.5 rounded-full hover:border-brand-green hover:text-brand-green transition shadow-sm font-light">
@@ -1879,6 +1945,7 @@ function PropertiesList({ properties, searchParams, onSelectProp, visualContent,
                   )}
               </div>
           )}
+          </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center flex-grow content-start">

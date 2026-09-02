@@ -22,10 +22,12 @@ import {
 import useSiteData from './useSiteData';
 import CinemaHero from './CinemaHero';
 import SalePageV4 from './SalePageV4';
+import FeaturedHomes from './FeaturedHomes';
 import useRevealOnScroll from './useRevealOnScroll';
 import { safeJsonLd } from '../../lib/seo';
 import {
-  HomeSection, PropertiesList, CalculatorSection, PortfolioSection,
+  HomeSection, LocationSection, PropertiesList, CalculatorSection, PortfolioSection,
+  searchResultHref,
   LoginModal, CustomAlertModal, AdminPanel, Lightbox, SmartImage, EditableText,
   getOptimizedImg, DEFAULT_LOCATIONS_DATA, DEFAULT_VISUAL_CONTENT, db, appId,
 } from './SiteApp';
@@ -42,9 +44,10 @@ const Youtube = ({ size = 22 }) => (
 
 const NAV_TABS = [
   { key: 'home', fallback: 'หน้าหลัก', field: 'navHome' },
+  /* ทำเลมาก่อนบ้านทั้งหมด — ลูกค้าส่วนใหญ่เลือกจากทำเลก่อนแล้วค่อยดูว่ามีบ้านอะไร */
+  { key: 'location', fallback: 'ทำเล', field: 'navLocation' },
   { key: 'all', fallback: 'บ้านทั้งหมด', field: 'navAll' },
   { key: 'promo', fallback: 'บ้านโปรโมชั่น', field: 'navPromo' },
-  { key: 'location', fallback: 'ทำเล', field: 'navLocation' },
   { key: 'calculator', fallback: 'คำนวณสินเชื่อ', field: 'navCalc' },
   { key: 'portfolio', fallback: 'ผลงาน', field: 'navPortfolio' },
 ];
@@ -127,15 +130,9 @@ export default function SiteV4({ basePath = '/v4' }) {
     setTimeout(jump, 60);
   }, [activeTab, goTab, isVisualEditMode, selectedProperty]);
 
-  const onNavTab = useCallback((key) => {
-    if (key === 'location') { goLocations(); return; }
-    goTab(key);
-  }, [goLocations, goTab]);
-  /* ลิงก์เก่า /v4?tab=location ไม่มีหน้าให้แสดงแล้ว พากลับไปที่การ์ดทำเลในฉากเปิดแทน */
-  useEffect(() => {
-    if (activeTab === 'location' && !selectedProperty) goLocations();
-  }, [activeTab, selectedProperty, goLocations]);
-
+  /* ทำเลมีหน้าของตัวเองแล้ว ไม่ต้องเด้งกลับไปที่การ์ดในฉากเปิดอีก
+     goLocations ยังเก็บไว้ให้ปุ่มในฉากเปิดเรียกใช้ */
+  const onNavTab = useCallback((key) => { goTab(key); }, [goTab]);
   const label = (field, fallback) => visualContent?.[field] || DEFAULT_VISUAL_CONTENT[field] || fallback;
 
   return (
@@ -305,12 +302,48 @@ export default function SiteV4({ basePath = '/v4' }) {
               {activeTab !== 'home' && isWaiting && <Waiting />}
 
               {activeTab === 'all' && !isWaiting && (
-                <PropertiesList
-                  properties={publicProperties}
-                  searchParams={{ type: 'all' }}
-                  onSelectProp={handleSelectProperty}
+                <div className="v4-allhomes">
+                  {/* บ้านเด่นที่เราคัดสรร — ชุดเดียวกับที่อยู่ในฉากเปิด */}
+                  <section className="v4-allhomes-featured reveal-on-scroll">
+                    <FeaturedHomes
+                      isEditMode={isVisualEditMode}
+                      hrefFor={(cat) => searchResultHref('category', cat)}
+                      onSelectCategory={(e, cat) => {
+                        if (e.ctrlKey || e.metaKey || e.button) return;
+                        e.preventDefault();
+                        handleFilterSelect('category', cat);
+                      }}
+                    />
+                  </section>
+
+                  {/* แยกตามหมวดหมู่ ทาวน์เฮาส์ / บ้านแฝด / บ้านเดี่ยว */}
+                  <HomeSection
+                    showLocationMarquee={false}
+                    showMap={false}
+                    showSearch={false}
+                    showCategorySections
+                    properties={publicProperties}
+                    loading={loading}
+                    onSelectProp={handleSelectProperty}
+                    setActiveTab={setActiveTab}
+                    onSelectLocation={handleFilterSelect}
+                    onSearchCategory={handleFilterSelect}
+                    onSearch={handleGlobalSearch}
+                    visualContent={visualContent}
+                    updateVisualContent={updateVisualContent}
+                    onUpdateLocationImage={handleLocationImageUpdate}
+                    onRemoveLocationImage={handleRemoveLocationImage}
+                    isEditMode={isVisualEditMode}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'location' && !isWaiting && (
+                <LocationSection
+                  onSelectLocation={handleFilterSelect}
                   visualContent={visualContent}
                   updateVisualContent={updateVisualContent}
+                  onUpdateLocationImage={handleLocationImageUpdate}
                   isEditMode={isVisualEditMode}
                 />
               )}

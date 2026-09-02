@@ -950,7 +950,10 @@ export default function CinemaHero({
 
             <div className="shade" />
 
-            <h1 className="hero-title">{companyName}</h1>
+            <h1 className="hero-title">
+              <span className="hero-title-main">{companyName}</span>
+              <span className="hero-title-sub">Real Estate</span>
+            </h1>
 
             <div className="intro-copy">
               <p className="intro-lead">
@@ -1174,13 +1177,38 @@ const cinemaCss = `
   position: absolute; z-index: 20; left: 50%; top: clamp(122px, 19vh, 205px);
   width: min(94vw, 1780px); margin: 0; color: #fdf1e1;
   font-family: Prompt, system-ui, sans-serif;
-  font-size: 6.6rem; font-weight: 200; line-height: 1.06; letter-spacing: 0.2em;
+  font-size: 6.6rem; font-weight: 200; line-height: 1.06;
   text-transform: uppercase;
   text-align: center; text-shadow: 0 22px 60px rgba(0,0,0,0.42);
+  display: flex; flex-direction: column; align-items: center;
   opacity: var(--title-opacity);
   transform: translate3d(-50%, var(--title-y), 0) scale(var(--title-scale));
   will-change: transform, opacity;
 }
+/**
+ * โลโก้สองบรรทัด : ชื่อบริษัทตัวใหญ่ ตามด้วย Real Estate ตัวเล็กกว่า
+ * แล้วขีดยาวใต้สุดแบบเดียวกับเส้นใต้ในโลโก้บริษัท
+ * ความยาวขีดผูกกับความกว้างของบรรทัดบน (ตัว h1 เป็น flex คอลัมน์ที่จัดกลาง
+ * ลูกทุกตัวจึงกว้างเท่าที่เนื้อหาต้องการ) จึงยืดหดตามขนาดจอเองโดยไม่ต้องกำหนดค่า
+ */
+.cinema-scroll .hero-title-main { display: block; letter-spacing: 0.2em; }
+.cinema-scroll .hero-title-sub {
+  display: block;
+  margin-top: 0.28em;
+  font-size: 0.34em;          /* อิงจากขนาดบรรทัดบน จึงย่อขยายตามกันทุกจอ */
+  letter-spacing: 0.46em;
+  opacity: 0.92;
+}
+.cinema-scroll .hero-title::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin-top: 0.3em;
+  background: currentColor;
+  opacity: 0.72;
+}
+
 .cinema-scroll .intro-copy {
   /**
    * ยึดจากขอบล่าง ค่ายิ่งมากยิ่งลอยสูงขึ้นไปหาหัวเรื่อง
