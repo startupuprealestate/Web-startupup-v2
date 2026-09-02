@@ -13,9 +13,9 @@
  */
 
 import Head from 'next/head';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Settings, Menu, X, Loader, Save, Layout, Type,
+  Settings, Search, Menu, X, Loader, Save, Layout, Type,
   ChevronLeft, ChevronRight, MessageCircle, Video,
 } from 'lucide-react';
 
@@ -85,6 +85,63 @@ export default function SiteV4({ basePath = '/v4' }) {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [navOverHero, setNavOverHero] = useState(false);
+
+  /**
+   * ช่องค้นหาบนแถบเมนู — ปกติเป็นแค่ปุ่มแว่นขยาย กดแล้วช่องพิมพ์คลี่ออกตรงนั้น
+   * ตอนหุบช่องกว้าง 0 จึงไม่กินที่ในแถบเมนูเลย
+   * ต่อเข้า handleGlobalSearch ตัวเดิมที่ช่องค้นหาหน้าแรกใช้อยู่ ไม่มีตรรกะค้นหาใหม่
+   */
+  const [isNavSearchOpen, setIsNavSearchOpen] = useState(false);
+  const [navSearchText, setNavSearchText] = useState('');
+  const navSearchInputRef = useRef(null);
+
+  const closeNavSearch = useCallback(() => {
+    setIsNavSearchOpen(false);
+    setNavSearchText('');
+  }, []);
+
+  const runSearch = useCallback((keyword) => {
+    handleGlobalSearch(keyword);
+    closeNavSearch();
+    setIsMenuOpen(false);
+  }, [closeNavSearch, handleGlobalSearch]);
+
+  /* ปุ่มแว่นขยายทำหน้าที่ทั้งเปิดช่องและสั่งค้นหา แล้วแต่ว่าตอนนั้นพิมพ์อะไรไว้หรือยัง */
+  const submitNavSearch = useCallback((e) => {
+    e.preventDefault();
+    const keyword = navSearchText.trim();
+    if (keyword) { runSearch(keyword); return; }
+    if (!isNavSearchOpen) {
+      setIsNavSearchOpen(true);
+      /* โฟกัสหลัง React วาดช่องเสร็จ ไม่งั้นจะไปโฟกัสตัวที่ยังกว้าง 0 แล้วหลุด */
+      requestAnimationFrame(() => navSearchInputRef.current?.focus());
+      return;
+    }
+    closeNavSearch();
+  }, [closeNavSearch, isNavSearchOpen, navSearchText, runSearch]);
+
+  const submitMenuSearch = useCallback((e) => {
+    e.preventDefault();
+    const keyword = navSearchText.trim();
+    if (keyword) runSearch(keyword);
+  }, [navSearchText, runSearch]);
+
+  /**
+   * ทางเข้าหลังบ้าน — ไม่มีปุ่มให้ลูกค้าเห็นบนหน้าเว็บแล้ว เปิดด้วย ?admin=1 แทน
+   * useSiteData จะล้างพารามิเตอร์นี้ออกจากแถบที่อยู่เองในจังหวะถัดไป
+   * รอให้โหลดเสร็จก่อนค่อยตัดสินใจ เพราะสิทธิ์ของบัญชีเพิ่งกู้คืนมาจาก Firebase
+   */
+  const [adminEntryPending, setAdminEntryPending] = useState(false);
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get('admin') === '1') setAdminEntryPending(true);
+    } catch (e) { /* ไม่มี window ก็ข้ามไป */ }
+  }, []);
+  useEffect(() => {
+    if (!adminEntryPending || loading) return;
+    setAdminEntryPending(false);
+    if (userRole) setShowAdminPanel(true); else setShowLoginModal(true);
+  }, [adminEntryPending, loading, userRole, setShowAdminPanel, setShowLoginModal]);
 
   const isCinemaView = activeTab === 'home' && !selectedProperty && !requestedPropSlug;
   const isWaiting = loading || Boolean(requestedPropSlug);
@@ -239,15 +296,39 @@ export default function SiteV4({ basePath = '/v4' }) {
                     : label(tab.field, tab.fallback)}
                 </a>
               ))}
+
+              <form
+                className={`v4-navsearch${isNavSearchOpen ? ' is-open' : ''}`}
+                role="search"
+                onSubmit={submitNavSearch}
+                /* คลิกที่อื่นแล้วยังไม่ได้พิมพ์อะไร ให้หุบกลับเป็นปุ่มเหมือนเดิม */
+                onBlur={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget) && !navSearchText.trim()) closeNavSearch();
+                }}
+              >
+                <input
+                  ref={navSearchInputRef}
+                  type="text"
+                  value={navSearchText}
+                  onChange={(e) => setNavSearchText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') closeNavSearch(); }}
+                  placeholder="ชื่อโครงการ ทำเล หรือราคา"
+                  aria-label="ค้นหาบ้าน"
+                  tabIndex={isNavSearchOpen ? 0 : -1}
+                  disabled={isVisualEditMode}
+                />
+                <button type="submit" aria-label="ค้นหา" disabled={isVisualEditMode}>
+                  <Search size={18} />
+                </button>
+              </form>
             </nav>
 
             <div className="v4-nav-actions">
-              {userRole ? (
+              {/* ไม่มีปุ่ม Admin Login ให้ลูกค้าเห็นแล้ว คนที่ล็อกอินผ่านแล้วเท่านั้นถึงเห็นปุ่มนี้ */}
+              {userRole && (
                 <button type="button" className="v4-admin-btn" disabled={isVisualEditMode} onClick={() => setShowAdminPanel(true)}>
                   <Settings size={14} /> ระบบจัดการ
                 </button>
-              ) : (
-                <button type="button" className="v4-login-btn" onClick={() => setShowLoginModal(true)}>Admin Login</button>
               )}
               <button type="button" className="v4-burger" aria-label="เมนู" onClick={() => setIsMenuOpen(v => !v)}>
                 {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -257,15 +338,27 @@ export default function SiteV4({ basePath = '/v4' }) {
 
           {isMenuOpen && (
             <div className="v4-mobile-menu">
+              <form className="v4-msearch" role="search" onSubmit={submitMenuSearch}>
+                <input
+                  type="text"
+                  value={navSearchText}
+                  onChange={(e) => setNavSearchText(e.target.value)}
+                  placeholder="ค้นหาบ้าน ทำเล หรือโครงการ"
+                  aria-label="ค้นหาบ้าน"
+                />
+                <button type="submit" aria-label="ค้นหา"><Search size={18} /></button>
+              </form>
               {NAV_TABS.map(tab => (
                 <button key={tab.key} type="button" onClick={() => onNavTab(tab.key)}>
                   {label(tab.field, tab.fallback)}
                 </button>
               ))}
-              <hr />
-              {userRole
-                ? <button type="button" onClick={() => { setShowAdminPanel(true); setIsMenuOpen(false); }}>เข้าสู่ระบบหลังบ้าน</button>
-                : <button type="button" onClick={() => { setShowLoginModal(true); setIsMenuOpen(false); }}>Admin Login</button>}
+              {userRole && (
+                <>
+                  <hr />
+                  <button type="button" onClick={() => { setShowAdminPanel(true); setIsMenuOpen(false); }}>เข้าสู่ระบบหลังบ้าน</button>
+                </>
+              )}
             </div>
           )}
         </header>
@@ -595,8 +688,41 @@ const v4Css = `
 .v4-nav-links a:hover::after, .v4-nav-links a.is-active::after { transform: scaleX(1); }
 .v4-nav.is-ghost .v4-nav-links a { color: rgba(253, 241, 225, 0.92); text-shadow: 0 2px 16px rgba(0,0,0,0.4); }
 
+/**
+ * ปุ่มแว่นขยายท้ายเมนู กดแล้วช่องพิมพ์คลี่ออกทางซ้ายตรงนั้นเลย
+ * ไม่เปิดแผ่นซ้อนใหม่ หน้าเว็บจึงไม่ต้องโหลดอะไรเพิ่ม
+ * ตอนหุบช่องกว้าง 0 และปิดรับคลิก เพื่อไม่ให้ดักโฟกัสตอนกด Tab
+ */
+.v4-navsearch {
+  display: flex; align-items: center; gap: 6px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 260ms ease;
+}
+.v4-navsearch.is-open { border-bottom-color: currentColor; }
+.v4-navsearch input {
+  width: 0; padding: 0; border: 0; background: none; outline: none;
+  font: inherit; font-size: 15px; color: var(--brand);
+  opacity: 0; pointer-events: none;
+  transition: width 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
+}
+.v4-navsearch.is-open input {
+  width: clamp(150px, 16vw, 230px); opacity: 1; pointer-events: auto;
+}
+.v4-navsearch input::placeholder { color: rgba(17, 20, 17, 0.38); }
+.v4-navsearch button {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; background: none; padding: 4px; cursor: pointer;
+  color: var(--brand); transition: opacity 200ms ease;
+}
+.v4-navsearch button:hover { opacity: 0.6; }
+.v4-navsearch button:disabled { opacity: 0.4; cursor: not-allowed; }
+.v4-nav.is-ghost .v4-navsearch { text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4); }
+.v4-nav.is-ghost .v4-navsearch input,
+.v4-nav.is-ghost .v4-navsearch button { color: #fdf1e1; }
+.v4-nav.is-ghost .v4-navsearch input::placeholder { color: rgba(253, 241, 225, 0.6); }
+
 .v4-nav-actions { display: flex; align-items: center; gap: 12px; }
-.v4-admin-btn, .v4-login-btn {
+.v4-admin-btn {
   display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer;
   font-family: inherit; font-size: 14px; white-space: nowrap; background: none;
 }
@@ -607,12 +733,8 @@ const v4Css = `
 }
 .v4-admin-btn:hover { background: var(--brand); color: var(--paper); }
 .v4-admin-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.v4-login-btn { color: rgba(17, 20, 17, 0.45); }
-.v4-login-btn:hover { color: var(--brand); }
 .v4-nav.is-ghost .v4-admin-btn { border-color: rgba(253,241,225,0.7); color: #fdf1e1; }
 .v4-nav.is-ghost .v4-admin-btn:hover { background: #fdf1e1; color: var(--brand); }
-.v4-nav.is-ghost .v4-login-btn { color: rgba(253, 241, 225, 0.7); }
-.v4-nav.is-ghost .v4-login-btn:hover { color: #fdf1e1; }
 
 .v4-burger { display: none; border: 0; background: none; cursor: pointer; color: inherit; padding: 6px; }
 .v4-nav.is-ghost .v4-burger { color: #fdf1e1; }
@@ -627,11 +749,24 @@ const v4Css = `
   font: inherit; font-size: 16px; color: var(--brand); cursor: pointer;
 }
 .v4-mobile-menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.v4-msearch {
+  display: flex; align-items: center; gap: 8px; margin: 2px 0 8px;
+  padding: 10px 16px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+}
+.v4-msearch input {
+  flex: 1 1 auto; min-width: 0; border: 0; background: none; outline: none;
+  font: inherit; font-size: 15px; color: var(--brand);
+}
+.v4-msearch input::placeholder { color: rgba(17, 20, 17, 0.38); }
+.v4-msearch button {
+  display: inline-flex; border: 0; background: none; padding: 0;
+  color: var(--brand); cursor: pointer;
+}
 
 @media (max-width: 1024px) {
   .v4-nav-links { display: none; }
   .v4-burger { display: inline-flex; }
-  .v4-admin-btn span, .v4-login-btn { display: none; }
+  .v4-admin-btn span { display: none; }
 }
 @media (min-width: 1025px) { .v4-mobile-menu { display: none; } }
 
