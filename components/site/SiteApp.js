@@ -2084,14 +2084,14 @@ function PortfolioSection({ companyInfo, properties, visualContent, updateVisual
             </div>
             
             {currentImages.length > 0 ? (
-                <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start gap-4">
                     {currentImages.map((img, i) => (
                         <div 
                             key={i} 
                             onClick={() => openLightbox(totalImages, startIndex + i)} 
                             onMouseEnter={() => preloadImage(img, 1600)}
                             onFocus={() => preloadImage(img, 1600)}
-                            className="break-inside-avoid rounded-xl overflow-hidden bg-gray-100 animate-pop shadow-sm hover:shadow-md cursor-pointer group mb-4 relative" 
+                            className="rounded-xl overflow-hidden bg-gray-100 animate-pop shadow-sm hover:shadow-md cursor-pointer group relative" 
                             style={{ animationDelay: `${(i % IMAGES_PER_PAGE) * 30}ms` }}
                         >
                             <SmartImage src={getOptimizedImg(img, 800)} className="w-full h-auto group-hover:scale-105 transition duration-500" alt={`Portfolio image ${startIndex + i + 1}`} width={800} height={1000} sizes="(max-width: 768px) 50vw, 25vw" loading="lazy" decoding="async"/>
