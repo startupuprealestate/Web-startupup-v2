@@ -2761,7 +2761,17 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
 
     const handlePortfolioUpload = async (e, yearValue) => { 
         if (!checkAccess('host')) return;
-        const files = Array.from(e.target.files);
+        /**
+         * ต้องเรียงไฟล์ตามชื่อเองก่อนอัปโหลด
+         *
+         * เบราว์เซอร์ไม่ได้คืนไฟล์ตามลำดับที่เห็นในโฟลเดอร์ มักเอาไฟล์ที่คลิกล่าสุดขึ้นก่อน
+         * รูปในอัลบั้มจึงสลับที่กันทั้งที่เลือกมาเรียง ๆ
+         *
+         * numeric: true จำเป็นมาก ถ้าเรียงแบบตัวอักษรล้วน _10 จะมาก่อน _2
+         * ซึ่งชื่อไฟล์รูปผลงานลงท้ายด้วยเลขลำดับพอดี
+         */
+        const byName = new Intl.Collator('th', { numeric: true, sensitivity: 'base' });
+        const files = Array.from(e.target.files).sort((a, b) => byName.compare(a.name, b.name));
         if (!files.length) return;
 
         setIsUploadingPortfolio({ state: true, year: yearValue });
