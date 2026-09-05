@@ -412,6 +412,19 @@ function SoldOutRibbon({ size = 'md' }) {
   );
 }
 
+/**
+ * เรียงไฟล์ที่เลือกมาตามชื่อ
+ *
+ * เบราว์เซอร์ไม่ได้คืนไฟล์ตามลำดับที่เห็นในโฟลเดอร์ มักเอาไฟล์ที่คลิกล่าสุดขึ้นก่อน
+ * ถ้าอัปโหลดตามลำดับที่มันส่งมา รูปจะสลับที่กันทั้งที่เลือกมาเรียง ๆ
+ *
+ * numeric: true จำเป็นมาก ถ้าเรียงแบบตัวอักษรล้วน _10 จะมาก่อน _2
+ * ซึ่งชื่อไฟล์รูปที่ถ่ายมาเป็นชุดมักลงท้ายด้วยเลขลำดับพอดี
+ */
+const FILE_NAME_ORDER = new Intl.Collator('th', { numeric: true, sensitivity: 'base' });
+const sortFilesByName = (fileList) =>
+  Array.from(fileList || []).sort((a, b) => FILE_NAME_ORDER.compare(a.name, b.name));
+
 const validateImage = (file) => {
   if (!file || !file.type) return false;
   if (!file.type.startsWith('image/')) {
@@ -2525,7 +2538,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
 
     const handlePropertyImageUpload = async (e) => {
         if (!checkAccess('admin')) return;
-        const files = Array.from(e.target.files);
+        const files = sortFilesByName(e.target.files);
         if (!files.length) return;
         
         const allowedFiles = files.slice(0, 10 - imagesPreview.length);
@@ -2761,17 +2774,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
 
     const handlePortfolioUpload = async (e, yearValue) => { 
         if (!checkAccess('host')) return;
-        /**
-         * ต้องเรียงไฟล์ตามชื่อเองก่อนอัปโหลด
-         *
-         * เบราว์เซอร์ไม่ได้คืนไฟล์ตามลำดับที่เห็นในโฟลเดอร์ มักเอาไฟล์ที่คลิกล่าสุดขึ้นก่อน
-         * รูปในอัลบั้มจึงสลับที่กันทั้งที่เลือกมาเรียง ๆ
-         *
-         * numeric: true จำเป็นมาก ถ้าเรียงแบบตัวอักษรล้วน _10 จะมาก่อน _2
-         * ซึ่งชื่อไฟล์รูปผลงานลงท้ายด้วยเลขลำดับพอดี
-         */
-        const byName = new Intl.Collator('th', { numeric: true, sensitivity: 'base' });
-        const files = Array.from(e.target.files).sort((a, b) => byName.compare(a.name, b.name));
+        const files = sortFilesByName(e.target.files);
         if (!files.length) return;
 
         setIsUploadingPortfolio({ state: true, year: yearValue });
@@ -2787,7 +2790,8 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             const yearIndex = updatedYears.findIndex(y => y.year === yearValue);
             if (yearIndex > -1) {
                 updatedYears[yearIndex] = { ...updatedYears[yearIndex] };
-                updatedYears[yearIndex].images = [...uploadedUrls, ...(updatedYears[yearIndex].images || [])];
+                /* ต่อท้ายของเดิม ไม่ใช่แทรกขึ้นหน้า อัลบั้มจึงเรียงตามลำดับที่อัปโหลดจริง */
+                updatedYears[yearIndex].images = [...(updatedYears[yearIndex].images || []), ...uploadedUrls];
             }
             setCompanyForm({ ...companyForm, portfolio_years: updatedYears });
             
