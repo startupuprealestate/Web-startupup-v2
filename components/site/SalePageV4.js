@@ -297,13 +297,6 @@ export default function SalePageV4({
 
   return (
     <div className="sp4">
-      {/* พื้นหลังจางจากรูปแรกของอัลบั้ม เปลี่ยนตามบ้านแต่ละหลังเอง */}
-      <div
-        className="sp4-bg"
-        aria-hidden="true"
-        style={{ backgroundImage: `url(${getOptimizedImg(images[0], 1400)})` }}
-      />
-
       {/* ── แถวควบคุมบนสุด ── */}
       <div className="sp4-topline">
         <button type="button" className="sp4-back" onClick={onBack}>
@@ -699,30 +692,9 @@ const css = `
   background: var(--paper); color: var(--ink);
   font-weight: 300; line-height: 1.75;
   container-type: inline-size;
-  position: relative; overflow: hidden; isolation: isolate;
+  position: relative; overflow: hidden;
 }
 
-/* ── พื้นหลังจากรูปแรกของอัลบั้ม ──
-   เบลอแรงและจางมาก ทำหน้าที่เป็นบรรยากาศ ไม่ใช่ภาพให้ดู
-   ไล่ขาวทับอีกชั้นเพื่อให้ตัวหนังสือยังอ่านชัดเท่าเดิม
-   z-index -1 คู่กับ isolation ที่ .sp4 เพื่อไม่ให้หลุดไปอยู่หลังทั้งหน้า */
-.sp4-bg {
-  position: absolute; inset: -8%; z-index: -1; pointer-events: none;
-  background-size: cover; background-position: center top;
-  animation: sp4bg 60s ease-in-out infinite alternate;
-}
-/* ผ้าคลุมสีขาวไล่ลง คุมความจางที่ตรงนี้ที่เดียว
-   ด้านบนโปร่งพอให้เห็นบ้าน ด้านล่างทึบเพื่อให้เนื้อหาอ่านสบาย */
-.sp4-bg::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(to bottom,
-    rgba(248,250,252,.50) 0%, rgba(248,250,252,.78) 30%,
-    rgba(248,250,252,.94) 56%, var(--paper) 78%);
-}
-@keyframes sp4bg {
-  from { transform: scale(1.02); }
-  to   { transform: scale(1.08) translate3d(-1%, -0.8%, 0); }
-}
 .sp4 * { box-sizing: border-box; }
 .sp4 :focus-visible { outline: 2px solid var(--forest); outline-offset: 3px; border-radius: var(--r1); }
 
@@ -1079,7 +1051,7 @@ const css = `
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sp4-bg, .sp4-skel { animation: none; }
+  .sp4-skel { animation: none; }
   .sp4-layer img, .sp4-dial .sun-orbit, .sp4-dial .needle,
   .sp4-pcard-img img,   .sp4-nav:hover { transform: translateY(-50%); }
   .sp4-back:hover, .sp4-act:hover, .sp4-mapbtn:hover, .sp4-strip button:hover,
