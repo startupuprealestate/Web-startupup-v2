@@ -218,7 +218,6 @@ const DEEP_LINK_AT = QUERY.t ? scrollForTime(QUERY.t) : QUERY.at;
 const PANEL_FADE = { in: 260, out: 190 };
 const PANEL_RANGES = {
   gate:    [470, 1120],   // 1.1-2.6 วิ  ประตูไม้กำลังเปิดออก
-  offer:   [1350, 2190],  // 3.2-4.3 วิ  ผ่านประตูเข้ามา เห็นทางเดินกับตัวบ้าน (ค้างภาพช่วงนี้)
   garden2: [2600, 3100],  // 4.5-5.9 วิ  สวนข้างบ้าน บานเลื่อนเปิดกว้าง
   room1:   [3350, 3900],  // 6.6-8.1 วิ  ก้าวเข้าห้องนั่งเล่น
   room2:   [4150, 4700],  // 8.8-10.3 วิ โซฟากับครอบครัว
@@ -244,7 +243,6 @@ const PANEL_SEGMENTS = Object.fromEntries(
  * เวลาเข้าโหมดแก้ไขหน้าเว็บ ค่าที่แก้จะถูกเขียนลง site_settings/visual เหมือนข้อความอื่นทั้งเว็บ
  */
 const CINE_TEXT = {
-  cineTagline: 'เลื่อนลงเพื่อเดินเข้าบ้านหลังนี้ไปด้วยกัน',
   /* ตัวเลขเล่าแบรนด์บนจอแรก — เป็นข้อความล้วน ไม่ได้นับจากคลังบ้านแล้ว แก้ได้จากหลังบ้าน */
   cineStat1Num: '300+',
   cineStat1Label: 'บ้านรอให้คุณเลือก',
@@ -257,6 +255,9 @@ const CINE_TEXT = {
   cineTag3: 'ดูแลถึงวันโอน',
   cineGateTitle: 'ประตูบานนี้ เปิดรอคุณอยู่',
   cineGateDesc: 'จากหน้าบ้านที่เงียบสงบ สู่พื้นที่ที่เป็นของครอบครัวคุณจริง ๆ',
+  /* หัวเรื่องเหนือแกลเลอรีทำเล */
+  cineSightsTitle: 'เลือกทำเลที่ใช่ ใกล้ที่ที่คุณใช้ชีวิต',
+  cineSightsDesc: 'ปทุมธานี อยุธยา นนทบุรี กรุงเทพฯ และอีกหลายทำเล เลื่อนดูแล้วแตะเพื่อดูบ้านในย่านนั้น',
   cineGarden2Title: 'เปิดบานเลื่อน สวนก็คือห้องนั่งเล่น',
   cineGarden2Desc: 'แสงเข้าเต็มบ้าน ลมผ่านตลอดวัน ในบ้านกับสวนต่อเนื่องเป็นผืนเดียวกัน',
   cineRoom1Title: 'บ้านเด่นที่เราคัดสรร',
@@ -353,12 +354,11 @@ export default function CinemaHero({
 }) {
   /**
    * ข้อความในฉาก : ค่าที่หลังบ้านแก้ไว้มาก่อน ถ้ายังไม่เคยแก้ก็ใช้ค่าเริ่มต้น
-   * ดึง homeTitle กับ searchPlaceholder จากชุดของหน้าเว็บหลักมาด้วย
-   * เพราะช่องค้นหาในฉากใช้ฟิลด์เดียวกัน แก้ที่หลังบ้านครั้งเดียวเปลี่ยนทั้งสองที่
+   * ช่องค้นหาบนจอแรกใช้ homeTitle ("ค้นหาบ้านที่ใช่สำหรับคุณ") เป็นข้อความในช่อง
+   * ฟิลด์เดียวกับหัวเรื่องหน้าค้นหาของเว็บหลัก แก้ที่หลังบ้านครั้งเดียวเปลี่ยนทั้งสองที่
    */
   const copy = useMemo(() => ({
     homeTitle: DEFAULT_VISUAL_CONTENT.homeTitle,
-    searchPlaceholder: DEFAULT_VISUAL_CONTENT.searchPlaceholder,
     ...CINE_TEXT,
     ...(visualContent || {}),
   }), [visualContent]);
@@ -368,7 +368,10 @@ export default function CinemaHero({
   const submitSearch = useCallback((event) => {
     event.preventDefault();
     if (isEditMode) return;
-    if (onSearch) onSearch(searchQuery.trim());
+    const keyword = searchQuery.trim();
+    /* กดแว่นขยายทั้งที่ยังไม่ได้พิมพ์ ให้พาเคอร์เซอร์เข้าช่องแทนการค้นหาคำว่าง */
+    if (!keyword) { event.currentTarget?.querySelector('input')?.focus(); return; }
+    if (onSearch) onSearch(keyword);
   }, [isEditMode, onSearch, searchQuery]);
 
   /* ฉากพื้นหลัง : scrub / loop / poster ตามอุปกรณ์ */
@@ -545,11 +548,12 @@ export default function CinemaHero({
       });
 
       /**
-       * ช่องค้นหาจะกดได้เฉพาะตอนที่มันโผล่มาจริง ๆ
+       * ช่องค้นหาอยู่บนจอแรกกับหัวเรื่อง กดได้เฉพาะตอนที่จอแรกยังไม่จางหาย
        * inert ตัดออกจากลำดับ Tab ด้วย ไม่งั้นกดแท็บแล้วเคอร์เซอร์ไปโผล่ในช่องที่มองไม่เห็น
        */
       if (searchRef.current) {
-        const shown = Number(panelRefs.current.offer?.style.getPropertyValue('--op') || 0) > 0.6;
+        /* ปิดเฉพาะตอนจอแรกจางจนแทบมองไม่เห็นแล้ว (เหลือ < 15%) ระหว่างนั้นยังพิมพ์ได้ตลอด */
+        const shown = introExit < 0.85;
         searchRef.current.style.pointerEvents = shown ? 'auto' : 'none';
         searchRef.current.inert = !shown;
       }
@@ -964,10 +968,23 @@ export default function CinemaHero({
                 <span className="hero-title-sub">Real Estate</span>
               </h1>
 
+              {/* ช่องค้นหาอยู่ใต้ชื่อบริษัทบนจอแรก — ข้อความในช่องใช้ homeTitle ของหน้าเว็บหลัก แก้จากหลังบ้านได้ */}
+              <form className="hero-search" ref={searchRef} onSubmit={submitSearch}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder={copy.homeTitle || 'ค้นหาบ้านที่ใช่สำหรับคุณ'}
+                  aria-label="ค้นหาบ้าน"
+                  disabled={isEditMode}
+                />
+                <button type="submit" disabled={isEditMode} aria-label="ค้นหา">
+                  <Search size={18} strokeWidth={1.75} />
+                </button>
+              </form>
+
               <div className="intro-copy">
-                <p className="intro-lead">
-                  {tagline} — <CineText tag="span" field="cineTagline" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-                </p>
+                <p className="intro-lead">{tagline}</p>
 
                 {/*
                   ตัวเลขเล่าแบรนด์ — เป็นข้อความล้วน กดไม่ได้ เพราะไม่มีปลายทางให้ไป
@@ -988,38 +1005,17 @@ export default function CinemaHero({
                   <CineText tag="span" field="cineTag2" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
                   <CineText tag="span" field="cineTag3" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
                 </div>
-                <div className="scroll-hint" aria-hidden="true"><span /></div>
+                {/* คำว่า "เลื่อนลง" อยู่เหนือไอคอนเมาส์ และขยับด้วยอนิเมชันชุดเดียวกับจุดในไอคอน */}
+                <div className="scroll-hint" aria-hidden="true">
+                  <span className="scroll-hint-word">เลื่อนลง</span>
+                  <i className="scroll-hint-mouse"><b /></i>
+                </div>
               </div>
             </div>
 
             <section className="story-panel panel-lo" ref={el => { panelRefs.current.gate = el; }}>
               <CineText tag="h2" field="cineGateTitle" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
               <CineText tag="p" field="cineGateDesc" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
-            </section>
-
-            {/* ช่องค้นหา — ชุดเดียวกับที่หน้าเว็บหลักใช้ ทั้งหัวเรื่องและ placeholder แก้จากหลังบ้านได้ */}
-            <section className="story-panel panel-top panel-search" ref={el => { panelRefs.current.offer = el; }}>
-              <EditableText
-                tag="h2"
-                fieldKey="homeTitle"
-                content={visualContent}
-                updateContent={updateVisualContent}
-                isEditMode={isEditMode}
-                className=""
-              />
-              <form className="cine-search" ref={searchRef} onSubmit={submitSearch}>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder={copy.searchPlaceholder}
-                  aria-label="ค้นหาบ้าน"
-                  disabled={isEditMode}
-                />
-                <button type="submit" disabled={isEditMode} aria-label="ค้นหา">
-                  <Search size={20} />
-                </button>
-              </form>
             </section>
 
             <section className="story-panel panel-lo" ref={el => { panelRefs.current.garden2 = el; }}>
@@ -1061,6 +1057,11 @@ export default function CinemaHero({
 
             {/* แกลเลอรีทำเล — คอมโพเนนต์แยก ข้อมูลมาจาก Firestore ชุดเดียว */}
             <div className="sights-slider" ref={sliderRef}>
+              {/* หัวเรื่องอยู่ในกล่องเดียวกับการ์ด จึงเลื่อนเข้า-ออกและอยู่กลางจอพร้อมกัน */}
+              <div className="sights-head">
+                <CineText tag="h2" field="cineSightsTitle" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+                <CineText tag="p" field="cineSightsDesc" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
+              </div>
               <LocationCarousel
                 items={locationCards}
                 isEditMode={isEditMode}
@@ -1117,7 +1118,6 @@ const cinemaCss = `
   --blur-tint: 7, 18, 11;
   --title-y: 0px; --title-scale: 1; --title-opacity: 1;
   --intro-copy-y: 0px; --intro-copy-opacity: 1;
-  --sights-top: clamp(250px, 36vh, 400px);
   --map-top: clamp(232px, 33vh, 330px);
   --map-height: clamp(300px, 56vh, 540px);
   position: relative;
@@ -1298,10 +1298,19 @@ const cinemaCss = `
 }
 
 .cinema-scroll .scroll-hint {
-  width: 24px; height: 40px; margin: 32px auto 0;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: max-content; margin: 32px auto 0;
+}
+.cinema-scroll .scroll-hint-word {
+  color: #fdf1e1; font-size: 0.88rem; font-weight: 500; letter-spacing: 0.02em;
+  text-shadow: 0 2px 14px rgba(0,0,0,0.55);
+  animation: cinemaScrollHint 1.8s ease-in-out infinite;
+}
+.cinema-scroll .scroll-hint-mouse {
+  display: block; width: 24px; height: 40px;
   border: 1px solid rgba(253,241,225,0.55); border-radius: 999px;
 }
-.cinema-scroll .scroll-hint span {
+.cinema-scroll .scroll-hint-mouse b {
   display: block; width: 3px; height: 8px; margin: 8px auto 0;
   border-radius: 999px; background: rgba(253,241,225,0.9);
   animation: cinemaScrollHint 1.8s ease-in-out infinite;
@@ -1397,42 +1406,61 @@ const cinemaCss = `
   text-shadow: 0 2px 18px rgba(0,0,0,0.55);
 }
 
-/* --- ช่องค้นหาในฉาก : หน้าตาเดียวกับของหน้าเว็บหลัก --- */
-/* วางให้พ้นแถบเมนูด้านบน และจบก่อนแกลเลอรีทำเลเริ่ม จะได้ไม่ทับกัน */
-.cinema-scroll .panel-search { top: clamp(132px, 22vh, 210px); }
-.cinema-scroll .panel-search h2 { margin-bottom: 26px; }
-.cinema-scroll .cine-search {
+/* --- ช่องค้นหาบนจอแรก : กระจกโปร่งชุดเดียวกับกล่องตัวเลข ไม่มีปุ่มเขียวทึบ --- */
+.cinema-scroll .hero-search {
   position: relative; display: flex; align-items: center;
-  width: min(640px, calc(100vw - 40px)); margin: 0 auto;
-  /* เปิด-ปิดการกดจาก JS ตามความจางของแผ่น กันไม่ให้ช่องที่มองไม่เห็นดักคลิก */
-  pointer-events: none;
+  width: min(520px, calc(100vw - 40px)); margin: 0 auto;
+  opacity: var(--intro-copy-opacity);
+  transform: translate3d(0, var(--intro-copy-y), 0);
+  will-change: transform, opacity;
+  /* จอแรกโชว์ตั้งแต่โหลด จึงเปิดรับการพิมพ์ไว้เลย แล้ว JS ค่อยปิดตอนเลื่อนจนจอแรกจางหาย
+     (กล่องแม่ .hero-stack ปิดรับคลิกไว้ ต้องเปิดที่นี่เอง ไม่งั้นแตะช่องแล้วคีย์บอร์ดไม่ขึ้น) */
+  pointer-events: auto;
 }
-.cinema-scroll .cine-search input {
-  width: 100%; padding: 17px 62px 17px 26px;
-  border: 1px solid rgba(255,255,255,0.7); border-radius: 999px;
-  background: #fff; color: #3f4a43;
-  font-family: inherit; font-size: 1rem; font-weight: 300;
-  box-shadow: 0 18px 44px rgba(0,0,0,0.32);
-  outline: none; transition: box-shadow 200ms ease;
+/* ใส่ [type="text"] ให้ชนะกฎกลาง .v4-main form input[type="text"] ที่ทาพื้นขาวกับเงาไว้ */
+.cinema-scroll .hero-search input[type="text"] {
+  width: 100%; min-height: 50px; box-shadow: none; padding: 0 58px 0 22px;
+  border: 1px solid rgba(253, 241, 225, 0.42); border-radius: 999px;
+  background: rgba(8, 18, 12, 0.34); color: #fdf1e1;
+  backdrop-filter: blur(8px);
+  font-family: inherit; font-size: 0.95rem; font-weight: 400;
+  outline: none; transition: border-color 200ms ease, background 200ms ease;
 }
-.cinema-scroll .cine-search input::placeholder { color: #9aa39c; }
-.cinema-scroll .cine-search input:focus {
-  box-shadow: 0 18px 44px rgba(0,0,0,0.32), 0 0 0 4px rgba(27,94,32,0.28);
+.cinema-scroll .hero-search input[type="text"]::placeholder { color: rgba(253, 241, 225, 0.78); }
+.cinema-scroll .hero-search input[type="text"]:focus {
+  border-color: rgba(253, 241, 225, 0.7); background: rgba(8, 18, 12, 0.44);
 }
-.cinema-scroll .cine-search button {
-  position: absolute; right: 7px;
+.cinema-scroll .hero-search button {
+  position: absolute; right: 6px;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%;
-  background: #1b5e20; color: #fff; cursor: pointer;
-  transition: background 180ms ease;
+  width: 38px; height: 38px; padding: 0; border-radius: 50%;
+  border: 1px solid rgba(253, 241, 225, 0.55); background: transparent;
+  color: #fdf1e1; cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
 }
-.cinema-scroll .cine-search button:hover { background: #135c2a; }
-.cinema-scroll .cine-search button:disabled { opacity: 0.5; cursor: default; }
+.cinema-scroll .hero-search button:hover { background: rgba(253, 241, 225, 0.16); border-color: rgba(253, 241, 225, 0.9); }
+.cinema-scroll .hero-search button:disabled { opacity: 0.5; cursor: default; }
+/* แกลเลอรีทำเลอยู่กึ่งกลางจอแนวตั้ง : ยึด top 50% แล้วดึงกลับครึ่งความสูงของตัวเอง
+   ระยะเข้า-ออกทางแนวนอนยังมาจาก --sights-enter-x ที่ JS ตั้งให้เหมือนเดิม */
 .cinema-scroll .sights-slider {
-  position: absolute; z-index: 25; left: 0; right: 0; top: var(--sights-top);
+  position: absolute; z-index: 25; left: 0; right: 0; top: 50%;
   visibility: var(--sights-visibility, hidden);
-  transform: translate3d(var(--sights-enter-x, 420vw), 0, 0);
+  transform: translate3d(var(--sights-enter-x, 420vw), -50%, 0);
   transform-origin: 0 0; will-change: transform;
+}
+.cinema-scroll .sights-head {
+  width: min(760px, calc(100vw - 42px)); margin: 0 auto 22px; text-align: center;
+}
+.cinema-scroll .sights-head h2 {
+  margin: 0; color: #fdf1e1;
+  font-family: Prompt, system-ui, sans-serif;
+  font-size: 2.6rem; font-weight: 500; line-height: 1.3; text-wrap: balance;
+  text-shadow: 0 16px 38px rgba(0,0,0,0.32), 0 2px 12px rgba(0,0,0,0.5);
+}
+.cinema-scroll .sights-head p {
+  width: min(600px, 100%); margin: 12px auto 0; color: #fdf1e1;
+  font-size: 1.05rem; font-weight: 500; line-height: 1.5; text-wrap: balance;
+  text-shadow: 0 2px 18px rgba(0,0,0,0.55);
 }
 /* แถบทำเล : เลื่อนด้วย scrollLeft จริง ไม่ใช่ transform จะได้ลากด้วยนิ้วได้ */
 /**
@@ -1453,7 +1481,6 @@ const cinemaCss = `
 }
 @media (max-width: 640px) {
   .cinema-scroll {
-    --sights-top: clamp(300px, 44vh, 420px);
     --map-top: clamp(212px, 33vh, 300px);
     --map-height: clamp(270px, 52vh, 440px);
   }
@@ -1470,12 +1497,14 @@ const cinemaCss = `
   .cinema-scroll .panel-hi { top: 27%; }
   .cinema-scroll .panel-lo { top: 62%; }
   .cinema-scroll .panel-top { top: 32%; }
-  .cinema-scroll .panel-search { top: clamp(150px, 24vh, 230px); }
   .cinema-scroll .panel-featured { top: clamp(340px, 50vh, 450px); }
   .cinema-scroll .fh-wrap { margin-top: 18px; }
   .cinema-scroll .panel-map { top: clamp(132px, 19vh, 175px); }
   .cinema-scroll .cine-map { width: calc(100vw - 24px); }
   .cinema-scroll .story-panel h2 { font-size: 1.75rem; }
+  .cinema-scroll .sights-head { margin-bottom: 14px; }
+  .cinema-scroll .sights-head h2 { font-size: 1.5rem; }
+  .cinema-scroll .sights-head p { font-size: 0.9rem; margin-top: 8px; }
   .cinema-scroll .sights-slider {
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
@@ -1514,11 +1543,10 @@ const cinemaCss = `
     --map-height: clamp(230px, 45vh, 320px);
   }
   .cinema-scroll .panel-map { top: clamp(134px, 23vh, 168px); }
-  .cinema-scroll .panel-search { top: clamp(140px, 22vh, 180px); }
   .cinema-scroll .panel-featured { top: clamp(210px, 34vh, 300px); }
   .cinema-scroll .fh-wrap { margin-top: 16px; }
-  .cinema-scroll .panel-search h2 { font-size: 1.6rem; margin-bottom: 18px; }
-  .cinema-scroll { --sights-top: clamp(240px, 36vh, 300px); }
+  .cinema-scroll .hero-search input[type="text"] { min-height: 46px; font-size: 0.9rem; }
+  .cinema-scroll .hero-search button { width: 34px; height: 34px; }
   .cinema-scroll .panel-map h2 { font-size: 1.45rem; }
   .cinema-scroll .panel-map p { font-size: 0.86rem; }
 }
@@ -1526,7 +1554,7 @@ const cinemaCss = `
   .cinema-scroll .scene, .cinema-scroll .hero-title, .cinema-scroll .intro-copy,
   .cinema-scroll .story-panel, .cinema-scroll .sights-slider { transition: none; }
   .cinema-scroll .cine-video, .cinema-scroll .cine-poster { transition: none; }
-  .cinema-scroll .scroll-hint span { animation: none; }
+  .cinema-scroll .scroll-hint-word, .cinema-scroll .scroll-hint-mouse b { animation: none; }
 }
 
 /**
