@@ -349,10 +349,16 @@ const uploadFileToCloudinary = async (file) => {
   } catch (error) { throw error; }
 };
 
-const getOptimizedImg = (url, width = 800) => {
+/**
+ * format:
+ *   'auto' (ค่าเริ่มต้น) ให้ Cloudinary เลือก webp/avif ที่เบาที่สุดตามเบราว์เซอร์ ใช้กับรูปทั่วทั้งหน้าเว็บ
+ *   'jpg'  บังคับเป็น .jpg ใช้เฉพาะไลท์บ็อกซ์ เพื่อให้คลิกขวาเซฟแล้วได้ไฟล์ที่เปิด/ส่งต่อได้ทุกที่
+ */
+const getOptimizedImg = (url, width = 800, format = 'auto') => {
   if (!url || typeof url !== 'string') return url;
   if (url.includes('cloudinary.com')) {
-      return url.replace('/upload/', `/upload/f_auto,q_auto,w_${width},c_limit/`);
+      const f = format === 'jpg' ? 'f_jpg' : 'f_auto';
+      return url.replace('/upload/', `/upload/${f},q_auto,w_${width},c_limit/`);
   }
   if (url.includes('images.unsplash.com')) {
       try {
@@ -371,9 +377,9 @@ const getOptimizedImg = (url, width = 800) => {
 
 const preloadedImageUrls = new Set();
 
-const preloadImage = (url, width = 1200) => {
+const preloadImage = (url, width = 1200, format = 'auto') => {
   if (typeof window === 'undefined' || !url) return;
-  const src = getOptimizedImg(url, width);
+  const src = getOptimizedImg(url, width, format);
   if (!src || preloadedImageUrls.has(src)) return;
   preloadedImageUrls.add(src);
   const img = new window.Image();
@@ -381,14 +387,14 @@ const preloadImage = (url, width = 1200) => {
   img.src = src;
 };
 
-const preloadImagesAround = (images, currentIndex, width = 1200, radius = 1) => {
+const preloadImagesAround = (images, currentIndex, width = 1200, radius = 1, format = 'auto') => {
   if (typeof window === 'undefined' || !Array.isArray(images) || images.length === 0) return;
   const targets = new Set([currentIndex]);
   for (let offset = 1; offset <= radius; offset += 1) {
       targets.add((currentIndex + offset) % images.length);
       targets.add((currentIndex - offset + images.length) % images.length);
   }
-  targets.forEach(index => preloadImage(images[index], width));
+  targets.forEach(index => preloadImage(images[index], width, format));
 };
 
 function SmartImage({
@@ -478,7 +484,8 @@ function Lightbox({ isOpen, images, startIndex, onClose }) {
 
   useEffect(() => {
       if (!isOpen) return;
-      preloadImagesAround(images, currentIndex, 1600, 1);
+      // ไลท์บ็อกซ์ใช้ .jpg เพื่อให้เซฟรูปได้สะดวก ต้อง preload ด้วย URL เดียวกัน ไม่งั้นโหลดซ้ำสองรอบ
+      preloadImagesAround(images, currentIndex, 1600, 1, 'jpg');
   }, [isOpen, images, currentIndex]);
 
   useEffect(() => {
@@ -514,7 +521,7 @@ function Lightbox({ isOpen, images, startIndex, onClose }) {
           
           <div className="relative w-full max-w-6xl h-full flex items-center justify-center p-4 md:p-8">
               <SmartImage 
-                  src={getOptimizedImg(images[currentIndex], 1600)} 
+                  src={getOptimizedImg(images[currentIndex], 1600, 'jpg')} 
                   alt={`Image ${currentIndex + 1}`} 
                   width={1600}
                   height={1200}
