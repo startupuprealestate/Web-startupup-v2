@@ -12,10 +12,24 @@ Container ของหัวข้อและการ์ดทำเลใน 
 - When to fire: **Once per page**
 - Minimum Percent Visible: **50**
 - Observe DOM changes: **เปิด** เพราะหน้าเว็บสร้างส่วนนี้ด้วย React
-- ผูก trigger กับ tag/event ที่ทีมการตลาดกำหนด เช่น GA4 `view_locations`
-  แล้วกำหนดเป็น key event/conversion ในระบบปลายทางตามแผนการวัดผล
+- Trigger: `EV - Home Locations - 50% - Once per page`
+- Tag: `GA4 - View Locations` ส่ง event `view_locations`
+- Measurement ID: `G-989XMRNC6Y`
 
-การเพิ่ม ID ยังไม่ได้สร้างหรือเผยแพร่ trigger/tag ในบัญชี GTM
+เผยแพร่แล้วใน GTM `GTM-N27PQGL2` เวอร์ชัน 27 เมื่อ 16 กันยายน 2026
+ชื่อเวอร์ชัน `Track home location views in GA4`
+การกำหนด `view_locations` เป็น GA4 key event ยังรอสิทธิ์แก้ไข GA4:
+บัญชีที่ใช้ตรวจสอบมีปุ่มสร้างเหตุการณ์และสลับสถานะ key event เป็น disabled
+สิทธิ์นี้แยกจากสิทธิ์เผยแพร่ GTM
+
+ผลตรวจ Tag Assistant บน `/v4` วันที่ 16 กันยายน 2026:
+- ก่อนเลื่อนถึงทำเล tag ยังไม่ทำงาน
+- เมื่อส่วนทำเลแสดงใน viewport เกิด `gtm.elementVisibility` และ tag ทำงาน 1 ครั้ง
+- เลื่อนออกและกลับเข้าใหม่ จำนวนครั้งยังเป็น 1
+- พบ Hit `view_locations` ไปยัง `https://analytics.google.com/g/collect`
+  โดยมี `tid=G-989XMRNC6Y`
+- ยังไม่ได้ยืนยันการปรากฏในรายงาน GA4 Realtime/DebugView ณ เวลาตรวจ
+
 หากใช้การนำทางภายในเว็บโดยไม่ reload ให้ตรวจพฤติกรรม Once per page
 ใน Preview ด้วย เพราะการกลับหน้าหลักอาจยังเป็น page เดิมของ GTM
 
