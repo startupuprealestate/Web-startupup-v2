@@ -399,7 +399,7 @@ export default function CinemaHero({
   const sliderRef = useRef(null);
   /* เอนจินอนิเมชันผูกครั้งเดียว จึงต้องอ่านสถานะโหมดแก้ไขผ่าน ref ไม่งั้นจะค้างค่าเก่า */
   const editModeRef = useRef(isEditMode);
-  editModeRef.current = isEditMode;
+  useEffect(() => { editModeRef.current = isEditMode; }, [isEditMode]);
   const progressRef = useRef(null);
 
   /* บ้านที่ยังขายอยู่ สำหรับปักหมุดบนแผนที่ตอนจบเรื่อง (ชุดเดียวกับที่หน้าเว็บหลักใช้) */
@@ -895,7 +895,6 @@ export default function CinemaHero({
       }
     };
     // ต้องผูกใหม่เมื่อโหมดพลิก ไม่งั้น ref ที่จับไว้จะเป็นของ element เก่าที่ถูกถอดไปแล้ว
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, coarse, scrubSrc]);
 
   return (
@@ -1056,7 +1055,7 @@ export default function CinemaHero({
             </section>
 
             {/* แกลเลอรีทำเล — คอมโพเนนต์แยก ข้อมูลมาจาก Firestore ชุดเดียว */}
-            <div className="sights-slider" ref={sliderRef}>
+            <div id="home-locations" className="sights-slider" ref={sliderRef}>
               {/* หัวเรื่องอยู่ในกล่องเดียวกับการ์ด จึงเลื่อนเข้า-ออกและอยู่กลางจอพร้อมกัน */}
               <div className="sights-head">
                 <CineText tag="h2" field="cineSightsTitle" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
