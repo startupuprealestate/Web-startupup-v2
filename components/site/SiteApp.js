@@ -13,7 +13,7 @@
  * }
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, useId } from 'react';
 import { Home, MapPin, Bed, Bath, Car, Maximize, Phone, MessageCircle, Menu, X, Plus, Trash2, ShieldCheck, CheckCircle, Calculator, Users, FileText, Settings, Edit, Save, Image as ImageIcon, Layout, ChevronLeft, ChevronRight, ChevronDown, Upload, Briefcase, XCircle, Tag, Loader, Video, Check, Copy, Calendar, FolderPlus, Map as MapIcon, Search, AlertTriangle, AlertCircle, Star, ClipboardCheck, Type, LayoutTemplate, Compass, SlidersHorizontal } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -1393,6 +1393,7 @@ function LocationSection({ onSelectLocation, visualContent, updateVisualContent,
 
 // --- CalculatorSection Component ---
 function CalculatorSection({ defaultPrice, minimalist = false, visualContent, updateVisualContent, isEditMode }) {
+  const fieldId = useId();
   const [loanAmount, setLoanAmount] = useState('');
   const [interest, setInterest] = useState(3);
   const [age, setAge] = useState('');
@@ -1434,23 +1435,23 @@ function CalculatorSection({ defaultPrice, minimalist = false, visualContent, up
       <div className="space-y-5">
          <div className={minimalist ? "space-y-4" : "grid grid-cols-2 gap-6"}>
              <div>
-                <label className="label flex justify-between items-center mb-2">
+                <label id={`${fieldId}-loan-label`} htmlFor={`${fieldId}-loan`} className="label flex justify-between items-center mb-2">
                     <span>วงเงินกู้ (บาท)</span>
                 </label>
                 <div className="flex flex-col gap-3">
-                    <input type="text" inputMode="numeric" value={loanAmount} onChange={handleLoanChange} className={`input-modern font-medium text-brand-green ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} />
-                    <input type="range" min="100000" max="15000000" step="10000" value={Number(String(loanAmount).replace(/,/g, '')) || 0} onChange={handleSliderChange} className={`w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0b3d1b] ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} />
+                    <input id={`${fieldId}-loan`} name="loan_amount" type="text" inputMode="numeric" value={loanAmount} onChange={handleLoanChange} className={`input-modern font-medium text-brand-green ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} />
+                    <input id={`${fieldId}-loan-range`} name="loan_amount_range" aria-labelledby={`${fieldId}-loan-label`} type="range" min="100000" max="15000000" step="10000" value={Number(String(loanAmount).replace(/,/g, '')) || 0} onChange={handleSliderChange} className={`w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0b3d1b] ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} />
                 </div>
              </div>
              <div className={minimalist ? "grid grid-cols-2 gap-4" : ""} >
-                <div><label className="label">ดอกเบี้ย (%)</label><input type="text" inputMode="numeric" value={interest} onChange={e=>setInterest(e.target.value.replace(/[^0-9.]/g, ''))} className={`input-modern ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} /></div>
+                <div><label htmlFor={`${fieldId}-interest`} className="label">ดอกเบี้ย (%)</label><input id={`${fieldId}-interest`} name="interest_rate" type="text" inputMode="decimal" value={interest} onChange={e=>setInterest(e.target.value.replace(/[^0-9.]/g, ''))} className={`input-modern ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} /></div>
                 {!minimalist && <div></div>}
              </div>
          </div>
          
          <div className="grid grid-cols-2 gap-4">
-             <div><label className="label">อายุผู้กู้ (ปี)</label><input type="text" inputMode="numeric" value={age} onChange={e=>setAge(e.target.value.replace(/[^0-9]/g, ''))} className={`input-modern ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} /></div>
-             <div><label className="label">ระยะเวลา (ปี)</label><div className="input-modern bg-gray-50 text-gray-500 border-transparent">{years > 0 ? `${years} ปี` : '-'}</div></div>
+             <div><label htmlFor={`${fieldId}-age`} className="label">อายุผู้กู้ (ปี)</label><input id={`${fieldId}-age`} name="borrower_age" type="text" inputMode="numeric" value={age} onChange={e=>setAge(e.target.value.replace(/[^0-9]/g, ''))} className={`input-modern ${isEditMode ? 'pointer-events-none opacity-60' : ''}`} disabled={isEditMode} /></div>
+             <div><span className="label">ระยะเวลา (ปี)</span><div className="input-modern bg-gray-50 text-gray-500 border-transparent">{years > 0 ? `${years} ปี` : '-'}</div></div>
          </div>
 
          <button onClick={handleCalculate} className="w-full bg-brand-green text-white py-3.5 rounded-full font-light mt-4 hover:bg-opacity-90 hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:hover:scale-100" disabled={isEditMode}>คำนวณ</button>

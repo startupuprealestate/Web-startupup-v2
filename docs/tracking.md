@@ -1,5 +1,12 @@
 # Tracking ส่วนทำเลหน้าแรก
 
+## การติดตั้ง GA4
+
+GTM `GTM-N27PQGL2` เป็นผู้โหลดและตั้งค่า Google tag `G-989XMRNC6Y`
+เพียงทางเดียว ใน `pages/_app.js` คงเฉพาะคิว `window.gtag` สำหรับ custom events
+และ bootstrap ของ GTM โดยไม่มีการโหลด `gtag/js` หรือเรียก `gtag('config')` ซ้ำ
+อย่าลบ Google tag ใน GTM เพราะ custom events ของหน้ารายละเอียดบ้านใช้ปลายทางนี้
+
 Container ของหัวข้อและการ์ดทำเลใน `components/site/CinemaHero.js` ใช้ ID
 `home-locations` (CSS selector: `#home-locations`) โดยกล่องนี้เลื่อนเข้า viewport
 พร้อมเนื้อหาจริง และถูกซ่อนไว้ก่อนถึงฉากทำเล
