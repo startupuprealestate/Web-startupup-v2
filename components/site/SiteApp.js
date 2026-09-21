@@ -2757,8 +2757,8 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
             const yearIndex = updatedYears.findIndex(y => y.year === yearValue);
             if (yearIndex > -1) {
                 updatedYears[yearIndex] = { ...updatedYears[yearIndex] };
-                /* ต่อท้ายของเดิม ไม่ใช่แทรกขึ้นหน้า อัลบั้มจึงเรียงตามลำดับที่อัปโหลดจริง */
-                updatedYears[yearIndex].images = [...(updatedYears[yearIndex].images || []), ...uploadedUrls];
+                /* รูปชุดใหม่ขึ้นก่อนรูปเดิม โดยคงลำดับชื่อไฟล์ภายในชุดที่อัปโหลด */
+                updatedYears[yearIndex].images = [...uploadedUrls, ...(updatedYears[yearIndex].images || [])];
             }
             setCompanyForm({ ...companyForm, portfolio_years: updatedYears });
             
