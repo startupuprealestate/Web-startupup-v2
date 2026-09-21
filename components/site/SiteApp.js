@@ -19,10 +19,11 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
-import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug, matchesPropertySlug } from '../../lib/firestorePublic';
+import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug } from '../../lib/firestorePublic';
 import { buildPageSeo, buildStructuredData, safeJsonLd } from '../../lib/seo';
 import { PROPERTY_OWNERS, DEFAULT_PROPERTY_OWNER, getPropertyOwner, selectPublicProperties } from '../../lib/propertyOwners';
 import { normalizeHouseKey, houseAliasKey } from '../../lib/masterStock';
+import usePropertyLink from './usePropertyLink';
 import { subscribeSiteSession } from '../../lib/siteSession';
 import { getPendingStockHouses, groupAdminStock } from '../../lib/adminStock';
 
@@ -3486,7 +3487,8 @@ export default function App() {
 
               setActiveTab(tab);
               if (sType && sValue) setSearchParams({ type: sType, value: sValue, area: params.get('sArea') || '' });
-              if (propSlug) setRequestedPropSlug(propSlug); else setSelectedProperty(null);
+              setRequestedPropSlug(propSlug);
+              if (!propSlug) setSelectedProperty(null);
           } catch (e) { console.warn("Cannot read URL parameters in this environment."); }
           setIsRouteReady(true);
       };
@@ -3495,26 +3497,10 @@ export default function App() {
       return () => window.removeEventListener('popstate', syncFromUrl);
   }, []);
 
-  useEffect(() => {
-      if (loading || !requestedPropSlug) return;
-      if (properties.length === 0) {
-          showGlobalAlert('ไม่พบข้อมูล', 'ยังโหลดข้อมูลบ้านไม่ได้ในตอนนี้ ระบบจะพากลับหน้าหลักก่อน', 'error');
-          setRequestedPropSlug(null);
-          setSelectedProperty(null);
-          setActiveTab('home');
-          return;
-      }
-
-      const prop = properties.find(p => matchesPropertySlug(p, requestedPropSlug));
-
-      if (prop) { 
-          setSelectedProperty(prop); 
-          setRequestedPropSlug(null); 
-      } else {
-          showGlobalAlert('ไม่พบข้อมูล', 'ไม่พบข้อมูลบ้านที่คุณระบุ อาจถูกขายไปแล้ว ระบบจะพากลับหน้าหลัก', 'error');
-          setRequestedPropSlug(null); 
-      }
-  }, [requestedPropSlug, loading, properties]);
+  usePropertyLink({
+    loading, requestedPropSlug, properties,
+    setRequestedPropSlug, setSelectedProperty, setActiveTab, setGlobalAlert,
+  });
 
   useEffect(() => {
       const params = new URLSearchParams();

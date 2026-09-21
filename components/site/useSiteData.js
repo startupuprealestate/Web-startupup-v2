@@ -27,10 +27,11 @@ import {
 } from 'firebase/firestore';
 
 import {
-  fetchPublicCollectionRest, fetchPublicDocumentRest, matchesPropertySlug,
+  fetchPublicCollectionRest, fetchPublicDocumentRest,
 } from '../../lib/firestorePublic';
 import { buildPageSeo, buildStructuredData } from '../../lib/seo';
 import { selectPublicProperties } from '../../lib/propertyOwners';
+import usePropertyLink from './usePropertyLink';
 import { subscribeSiteSession } from '../../lib/siteSession';
 
 import {
@@ -125,7 +126,8 @@ export default function useSiteData({ basePath = '/' } = {}) {
 
         setActiveTab(tab);
         if (sType && sValue) setSearchParams({ type: sType, value: sValue, area: params.get('sArea') || '' });
-        if (propSlug) setRequestedPropSlug(propSlug); else setSelectedProperty(null);
+        setRequestedPropSlug(propSlug);
+        if (!propSlug) setSelectedProperty(null);
       } catch (e) {
         console.warn('Cannot read URL parameters in this environment.');
       }
@@ -136,25 +138,10 @@ export default function useSiteData({ basePath = '/' } = {}) {
     return () => window.removeEventListener('popstate', syncFromUrl);
   }, []);
 
-  useEffect(() => {
-    if (loading || !requestedPropSlug) return;
-    if (properties.length === 0) {
-      showGlobalAlert('ไม่พบข้อมูล', 'ยังโหลดข้อมูลบ้านไม่ได้ในตอนนี้ ระบบจะพากลับหน้าหลักก่อน', 'error');
-      setRequestedPropSlug(null);
-      setSelectedProperty(null);
-      setActiveTab('home');
-      return;
-    }
-
-    const prop = properties.find(p => matchesPropertySlug(p, requestedPropSlug));
-    if (prop) {
-      setSelectedProperty(prop);
-      setRequestedPropSlug(null);
-    } else {
-      showGlobalAlert('ไม่พบข้อมูล', 'ไม่พบข้อมูลบ้านที่คุณระบุ อาจถูกขายไปแล้ว ระบบจะพากลับหน้าหลัก', 'error');
-      setRequestedPropSlug(null);
-    }
-  }, [requestedPropSlug, loading, properties, showGlobalAlert]);
+  usePropertyLink({
+    loading, requestedPropSlug, properties,
+    setRequestedPropSlug, setSelectedProperty, setActiveTab, setGlobalAlert,
+  });
 
   /* ---------- เขียนสถานะกลับลง URL ---------- */
   useEffect(() => {
