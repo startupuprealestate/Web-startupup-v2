@@ -139,7 +139,7 @@ export default function useSiteData({ basePath = '/' } = {}) {
   }, []);
 
   usePropertyLink({
-    loading, requestedPropSlug, properties,
+    db, appId, loading, requestedPropSlug, properties, selectedProperty,
     setRequestedPropSlug, setSelectedProperty, setActiveTab, setGlobalAlert,
   });
 
@@ -568,12 +568,14 @@ export default function useSiteData({ basePath = '/' } = {}) {
   }, []);
 
   const goTab = useCallback((tab) => {
+    setRequestedPropSlug(null);
     setActiveTab(tab);
     setSelectedProperty(null);
     jumpTop();
   }, [jumpTop]);
 
   const handleFilterSelect = useCallback((type, value, area = '') => {
+    setRequestedPropSlug(null);
     setSearchParams({ type, value, area });
     setActiveTab('search_result');
     setSelectedProperty(null);
@@ -581,6 +583,7 @@ export default function useSiteData({ basePath = '/' } = {}) {
   }, [jumpTop]);
 
   const handleGlobalSearch = useCallback((keyword) => {
+    setRequestedPropSlug(null);
     setSearchParams({ type: 'keyword', value: keyword, area: '' });
     setActiveTab('search_result');
     setSelectedProperty(null);
@@ -588,7 +591,7 @@ export default function useSiteData({ basePath = '/' } = {}) {
   }, [jumpTop]);
 
   const handleSelectProperty = useCallback((p) => {
-    setSelectedProperty(p);
+    setRequestedPropSlug(generatePropSlug(p));
     jumpTop();
   }, [jumpTop]);
 

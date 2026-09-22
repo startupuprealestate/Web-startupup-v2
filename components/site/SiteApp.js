@@ -3455,7 +3455,7 @@ export default function App() {
 
   useEffect(() => {
       window.scrollTo(0, 0);
-  }, [activeTab, selectedProperty, searchParams]);
+  }, [activeTab, selectedProperty?.id, searchParams]);
 
   useEffect(() => {
       const observer = new IntersectionObserver((entries) => {
@@ -3498,7 +3498,7 @@ export default function App() {
   }, []);
 
   usePropertyLink({
-    loading, requestedPropSlug, properties,
+    db, appId, loading, requestedPropSlug, properties, selectedProperty,
     setRequestedPropSlug, setSelectedProperty, setActiveTab, setGlobalAlert,
   });
 
@@ -3937,7 +3937,7 @@ export default function App() {
     setSearchParams({ type: 'keyword', value: query, area: '' }); setActiveTab('search_result'); setSelectedProperty(null); window.scrollTo(0, 0);
   };
   const handleSelectProperty = (p) => {
-    setSelectedProperty(p); window.scrollTo(0, 0);
+    setRequestedPropSlug(generatePropSlug(p)); window.scrollTo(0, 0);
   };
 
   const globalCss = `
