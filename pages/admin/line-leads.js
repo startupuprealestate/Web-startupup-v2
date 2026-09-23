@@ -2,7 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { ArrowLeft, ArrowUpRight, Check, Copy, Link2, LockKeyhole, RefreshCw, Search, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, CalendarDays, Check, Copy, Link2, LockKeyhole, RefreshCw, Search, Users, X } from 'lucide-react';
 import { lineAdminAuth } from '../../lib/lineClientAuth';
 import { SOURCE_LABELS, sourceGroup } from '../../lib/lineAttribution';
 import { PLATFORM_LABELS, defaultReportRange, formatReportDate, parseReportDate, reportPlatform, reportRange } from '../../lib/lineReport';
@@ -15,6 +15,63 @@ const linkPresets = [
   { label: 'Google Ads · เข้าเว็บไซต์', source: 'google', medium: 'cpc', campaign: 'google_search', path: '/' },
 ];
 const formatDate = value => value ? new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' }).format(new Date(value)) : '—';
+function ReportDateInput({ name, label, initialValue, error }) {
+  const [text, setText] = useState(() => formatReportDate(initialValue));
+  const [calendarDate, setCalendarDate] = useState(initialValue);
+  const [month, setMonth] = useState(initialValue.slice(0, 7));
+  const calendar = useRef(null);
+  const year = Number(month.slice(0, 4));
+  const monthNumber = Number(month.slice(5));
+  const firstWeekday = new Date(Date.UTC(year, monthNumber - 1, 1)).getUTCDay();
+  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+  const years = Array.from(new Set([...Array.from({ length: 131 }, (_, index) => 1970 + index), year])).sort((a, b) => a - b);
+  function openCalendar() {
+    setMonth(calendarDate.slice(0, 7));
+    calendar.current.showModal();
+  }
+  function moveMonth(direction) {
+    const date = new Date(Date.UTC(year, monthNumber - 1 + direction, 1));
+    setMonth(date.toISOString().slice(0, 7));
+  }
+  function chooseDate(value) {
+    setCalendarDate(value);
+    setText(formatReportDate(value));
+    calendar.current.close();
+  }
+  function typeDate(event) {
+    const value = event.target.value;
+    setText(value);
+    try { setCalendarDate(parseReportDate(value)); }
+    catch { /* Keep the calendar on the last valid date while typing. */ }
+  }
+  return <div className={styles.dateField}>
+    <label htmlFor={`report-${name}`}>{label}</label>
+    <div className={styles.dateControl}>
+      <input id={`report-${name}`} type="text" name={name} required placeholder="dd/mm/yyyy" maxLength={10} value={text} onChange={typeDate} aria-describedby={error ? 'date-help date-error' : 'date-help'} aria-invalid={Boolean(error)} />
+      <button type="button" className={styles.calendarPicker} aria-label={`เลือก${label}จากปฏิทิน`} aria-haspopup="dialog" aria-controls={`calendar-${name}`} onClick={openCalendar}><CalendarDays size={20} aria-hidden="true" /></button>
+    </div>
+    <dialog ref={calendar} id={`calendar-${name}`} className={styles.dateDialog} aria-labelledby={`calendar-title-${name}`}>
+      <div className={styles.calendarHeading}><h3 id={`calendar-title-${name}`}>เลือก{label}</h3><button type="button" className={styles.closeDialog} aria-label="ปิดปฏิทิน" onClick={() => calendar.current.close()}><X size={20} aria-hidden="true" /></button></div>
+      <div className={styles.calendarNavigation}>
+        <button type="button" className={styles.secondary} aria-label="เดือนก่อนหน้า" disabled={month === '1970-01'} onClick={() => moveMonth(-1)}>‹</button>
+        <select aria-label="เดือน" value={monthNumber} onChange={event => setMonth(`${year}-${event.target.value.padStart(2, '0')}`)}>{months.map((item, index) => <option key={item} value={index + 1}>{item}</option>)}</select>
+        <select aria-label="ปี ค.ศ." value={year} onChange={event => setMonth(`${event.target.value}-${String(monthNumber).padStart(2, '0')}`)}>{years.map(item => <option key={item} value={item}>{item}</option>)}</select>
+        <button type="button" className={styles.secondary} aria-label="เดือนถัดไป" disabled={month === '9999-12'} onClick={() => moveMonth(1)}>›</button>
+      </div>
+      <p className={styles.srOnly} aria-live="polite">{months[monthNumber - 1]} {year}</p>
+      <div className={styles.calendarGrid}>
+        {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(day => <span key={day} aria-hidden="true">{day}</span>)}
+        {Array.from({ length: firstWeekday }, (_, index) => <span key={`blank-${index}`} />)}
+        {Array.from({ length: daysInMonth }, (_, index) => {
+          const value = `${month}-${String(index + 1).padStart(2, '0')}`;
+          return <button type="button" key={value} aria-label={formatReportDate(value)} aria-pressed={value === calendarDate} onClick={() => chooseDate(value)}>{index + 1}</button>;
+        })}
+      </div>
+      <p className={styles.calendarHint}>เลือกวันเพื่อใส่วันที่ในรูปแบบ dd/mm/yyyy</p>
+    </dialog>
+  </div>;
+}
 function Tag({ touch }) { const source = sourceGroup(touch); return <span className={styles.tag} data-source={source}>{SOURCE_LABELS[source] || SOURCE_LABELS.unknown}</span>; }
 function ContactStatus({ lead }) {
   if ((lead.lastUnfollowAt || 0) > (lead.lastFollowAt || 0)) return 'บล็อกบัญชี';
@@ -157,12 +214,12 @@ export default function LineLeads({ isDemo, initialRange }) {
         <section className={styles.panel} aria-labelledby="sources-title" aria-busy={loading}>
           <div className={styles.panelHeading}><div><h2 id="sources-title">สรุปที่มาลูกค้าแยกช่องทาง</h2><p>นับจำนวนครั้งที่เข้ามา รวมลูกค้าคนเดิมที่กลับมาอีกครั้ง</p></div><button className={styles.secondary} disabled={loading || isDemo} onClick={() => load(user)}><RefreshCw size={16} aria-hidden="true" />{loading ? 'กำลังโหลด…' : 'อัปเดตข้อมูล'}</button></div>
           <form className={styles.dateFilters} onSubmit={applyDates} noValidate>
-            <label><span>วันที่เริ่มต้น</span><input type="text" name="start" required placeholder="dd/mm/yyyy" maxLength={10} defaultValue={formatReportDate(initialRange.start)} aria-describedby={dateError ? 'date-help date-error' : 'date-help'} aria-invalid={Boolean(dateError)} /></label>
-            <label><span>วันที่สิ้นสุด</span><input type="text" name="end" required placeholder="dd/mm/yyyy" maxLength={10} defaultValue={formatReportDate(initialRange.end)} aria-describedby={dateError ? 'date-help date-error' : 'date-help'} aria-invalid={Boolean(dateError)} /></label>
+            <ReportDateInput name="start" label="วันที่เริ่มต้น" initialValue={initialRange.start} error={dateError} />
+            <ReportDateInput name="end" label="วันที่สิ้นสุด" initialValue={initialRange.end} error={dateError} />
             <button className={styles.primary} disabled={loading}>ดูข้อมูลตามวันที่</button>
           </form>
           {dateError && <p id="date-error" role="alert" className={styles.error}>{dateError}</p>}
-          <p id="date-help" className={styles.muted}>วัน/เดือน/ปี ค.ศ. (dd/mm/yyyy) · เวลาไทย · รวมทั้งวันเริ่มต้นและวันสิ้นสุด · กดดูข้อมูลตามวันที่เพื่อใช้ช่วงที่เลือก</p>
+          <p id="date-help" className={styles.muted}>กดรูปปฏิทินเพื่อเลือกวันที่ หรือพิมพ์ dd/mm/yyyy (ปี ค.ศ.) · เวลาไทย · รวมทั้งวันเริ่มต้นและวันสิ้นสุด · กดดูข้อมูลตามวันที่เพื่อใช้ช่วงที่เลือก</p>
           <p className={styles.resultCount} role="status">ช่วงที่แสดง {formatReportDate(filters.start)} ถึง {formatReportDate(filters.end)}{loading ? ' · กำลังโหลด…' : ''}</p>
           <table className={styles.sourceTable}><caption className={styles.srOnly}>จำนวนรายการแต่ละช่องทางในช่วงวันที่ที่แสดง</caption><thead><tr><th scope="col">ช่องทาง</th><th scope="col">จำนวนครั้ง</th><th scope="col"><span className={styles.srOnly}>ดูรายชื่อ</span></th></tr></thead><tbody>
             {Object.entries(PLATFORM_LABELS).map(([key, label]) => <tr key={key} data-active={filters.platform === key}><th scope="row"><button className={styles.platformButton} disabled={loading} aria-haspopup="dialog" aria-controls="line-customer-dialog" onClick={() => choosePlatform(key)}>{label}</button></th><td className={styles.numeric}>{counts?.[key] ?? '—'}</td><td><button className={styles.textButton} disabled={loading} onClick={() => choosePlatform(key)} aria-haspopup="dialog" aria-controls="line-customer-dialog" aria-label={`ดูรายชื่อจาก ${label}`}>ดูรายชื่อ <ArrowUpRight size={14} aria-hidden="true" /></button></td></tr>)}
