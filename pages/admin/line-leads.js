@@ -9,6 +9,7 @@ import { PLATFORM_LABELS, defaultReportRange, formatReportDate, parseReportDate,
 import styles from '../../styles/line-leads.module.css';
 
 const ROOT = 'https://www.startupup-real-estate.com';
+const summaryPlatforms = Object.entries(PLATFORM_LABELS).filter(([key]) => key !== 'google_organic' && key !== 'other');
 const linkPresets = [
   { label: 'TikTok · หน้าโปรไฟล์', source: 'tiktok', medium: 'social', campaign: 'tiktok_bio', path: '/line/go' },
   { label: 'Facebook · หน้าเพจ', source: 'facebook', medium: 'social', campaign: 'facebook_page', path: '/line/go' },
@@ -222,7 +223,7 @@ export default function LineLeads({ isDemo, initialRange }) {
           <p id="date-help" className={styles.muted}>กดรูปปฏิทินเพื่อเลือกวันที่ หรือพิมพ์ dd/mm/yyyy (ปี ค.ศ.) · เวลาไทย · รวมทั้งวันเริ่มต้นและวันสิ้นสุด · กดดูข้อมูลตามวันที่เพื่อใช้ช่วงที่เลือก</p>
           <p className={styles.resultCount} role="status">ช่วงที่แสดง {formatReportDate(filters.start)} ถึง {formatReportDate(filters.end)}{loading ? ' · กำลังโหลด…' : ''}</p>
           <table className={styles.sourceTable}><caption className={styles.srOnly}>จำนวนรายการแต่ละช่องทางในช่วงวันที่ที่แสดง</caption><thead><tr><th scope="col">ช่องทาง</th><th scope="col">จำนวนครั้ง</th><th scope="col"><span className={styles.srOnly}>ดูรายชื่อ</span></th></tr></thead><tbody>
-            {Object.entries(PLATFORM_LABELS).map(([key, label]) => <tr key={key} data-active={filters.platform === key}><th scope="row"><button className={styles.platformButton} disabled={loading} aria-haspopup="dialog" aria-controls="line-customer-dialog" onClick={() => choosePlatform(key)}>{label}</button></th><td className={styles.numeric}>{counts?.[key] ?? '—'}</td><td><button className={styles.textButton} disabled={loading} onClick={() => choosePlatform(key)} aria-haspopup="dialog" aria-controls="line-customer-dialog" aria-label={`ดูรายชื่อจาก ${label}`}>ดูรายชื่อ <ArrowUpRight size={14} aria-hidden="true" /></button></td></tr>)}
+            {summaryPlatforms.map(([key, label]) => <tr key={key} data-active={filters.platform === key}><th scope="row"><button className={styles.platformButton} disabled={loading} aria-haspopup="dialog" aria-controls="line-customer-dialog" onClick={() => choosePlatform(key)}>{label}</button></th><td className={styles.numeric}>{counts?.[key] ?? '—'}</td><td><button className={styles.textButton} disabled={loading} onClick={() => choosePlatform(key)} aria-haspopup="dialog" aria-controls="line-customer-dialog" aria-label={`ดูรายชื่อจาก ${label}`}>ดูรายชื่อ <ArrowUpRight size={14} aria-hidden="true" /></button></td></tr>)}
           </tbody><tfoot><tr><th scope="row">รวมทุกช่องทาง</th><td className={styles.numeric}>{total ?? '—'}</td><td><button className={styles.textButton} disabled={loading} onClick={() => choosePlatform('all')} aria-haspopup="dialog" aria-controls="line-customer-dialog">ดูทั้งหมด</button></td></tr></tfoot></table>
           <p className={styles.muted}>นับเมื่อเชื่อมบัญชี LINE สำเร็จ หรือพบการติดต่อโดยตรงครั้งแรก ไม่ใช่จำนวนคนที่ไม่ซ้ำกัน ข้อความแชทแต่ละข้อความไม่นับเป็นการเข้ามาใหม่</p>
           <p className={styles.muted}>ข้อมูลเดิมก่อนเปิดประวัติแยกครั้งแสดงได้เท่าที่มีบันทึกไว้ และติดป้าย “ข้อมูลเดิม” การกลับมาครั้งใหม่จะเพิ่มแถวโดยไม่แทนที่แถวเดิม</p>
