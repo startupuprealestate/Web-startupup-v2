@@ -19,6 +19,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signOut, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
+import Link from 'next/link';
+import { lineContactHref } from '../../lib/lineAttribution';
 import { fetchPublicCollectionRest, fetchPublicDocumentRest, makePropertySlug } from '../../lib/firestorePublic';
 import { buildPageSeo, buildStructuredData, safeJsonLd } from '../../lib/seo';
 import { PROPERTY_OWNERS, DEFAULT_PROPERTY_OWNER, getPropertyOwner, selectPublicProperties } from '../../lib/propertyOwners';
@@ -1761,7 +1763,7 @@ function SalePage({ property, companyInfo, onBack, properties, onSelectProp, vis
                 <h3 className="font-medium text-base mb-5">สนใจติดต่อ</h3>
                 <div className="space-y-3 mb-6">
                     <a href={isEditMode ? '#' : `tel:${companyInfo?.phone}`} className={`flex items-center justify-center gap-2 w-full bg-brand-green text-white py-3 rounded-full text-sm font-light hover:bg-opacity-90 transition hover:-translate-y-1 ${isEditMode ? 'pointer-events-none' : ''}`}><Phone size={16} /> {companyInfo?.phone}</a>
-                    <a href={isEditMode ? '#' : companyInfo?.line} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-center gap-2 w-full bg-[#06C755] text-white py-3 rounded-full text-sm font-light hover:bg-opacity-90 transition hover:-translate-y-1 ${isEditMode ? 'pointer-events-none' : ''}`}><MessageCircle size={16} /> ทักไลน์</a>
+                    <a href={isEditMode ? '#' : lineContactHref(property)} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-center gap-2 w-full bg-[#06C755] text-white py-3 rounded-full text-sm font-light hover:bg-opacity-90 transition hover:-translate-y-1 ${isEditMode ? 'pointer-events-none' : ''}`}><MessageCircle size={16} /> ทักไลน์</a>
                 </div>
                 <div className="border-t border-gray-100 pt-5 text-left">
                     <CalculatorSection defaultPrice={property.price} minimalist={true} visualContent={visualContent} updateVisualContent={updateVisualContent} isEditMode={isEditMode} />
@@ -2835,6 +2837,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
 
             <div className="flex flex-1 overflow-hidden">
                 <div className="w-64 bg-white border-r py-6 flex flex-col gap-2 hidden md:flex">
+                    <Link href="/admin/line-leads" prefetch={false} onClick={e => { e.preventDefault(); window.location.assign('/admin/line-leads'); }} className="px-6 py-3 text-left text-sm flex items-center gap-3 text-brand-green hover:bg-brand-light"><Tag size={18}/> ที่มาลูกค้า LINE</Link>
                     {userRole === 'host' && <button onClick={enterVisualEditMode} className={`px-6 py-3 text-left text-sm flex items-center gap-3 transition text-blue-600 hover:bg-blue-50 bg-blue-50/50`}><Layout size={18}/> ปรับแก้หน้าตาเว็บไซต์</button>}
                     <button onClick={() => { setPanelTab('properties'); setIsEditing(false); }} className={`px-6 py-3 text-left text-sm flex items-center gap-3 transition ${panelTab === 'properties' ? 'text-brand-green bg-brand-light font-medium border-r-2 border-brand-green' : 'text-gray-500 hover:bg-gray-50'}`}><Home size={18}/> จัดการบ้าน <span className="text-xs bg-gray-200 px-2 py-0.5 rounded-full text-gray-600 ml-1">{properties.length}</span></button>
                     {userRole === 'host' && <button onClick={() => setPanelTab('company')} className={`px-6 py-3 text-left text-sm flex items-center gap-3 transition ${panelTab === 'company' ? 'text-brand-green bg-brand-light font-medium border-r-2 border-brand-green' : 'text-gray-500 hover:bg-gray-50'}`}><Briefcase size={18}/> ข้อมูลบริษัท</button>}
@@ -2845,6 +2848,7 @@ function AdminPanel({ userRole, userEmail, properties, users, companyInfo, popup
 
                 <div className="flex-1 p-4 md:p-8 overflow-y-auto">
                     <div className="md:hidden flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
+                        <Link href="/admin/line-leads" prefetch={false} onClick={e => { e.preventDefault(); window.location.assign('/admin/line-leads'); }} className="whitespace-nowrap px-4 py-2 text-sm flex items-center gap-2 rounded-full bg-white text-brand-green border"><Tag size={14}/> ที่มาลูกค้า LINE</Link>
                         {userRole === 'host' && <button onClick={enterVisualEditMode} className={`whitespace-nowrap px-4 py-2 text-sm flex items-center gap-2 rounded-full transition bg-blue-50 text-blue-600 border border-blue-200`}><Layout size={14}/> ปรับแก้หน้าเว็บ</button>}
                         <button onClick={() => { setPanelTab('properties'); setIsEditing(false); }} className={`whitespace-nowrap px-4 py-2 text-sm flex items-center gap-2 rounded-full transition ${panelTab === 'properties' ? 'bg-brand-green text-white' : 'bg-white text-gray-600 border'}`}><Home size={14}/> จัดการบ้าน</button>
                         {userRole === 'host' && <button onClick={() => setPanelTab('company')} className={`whitespace-nowrap px-4 py-2 text-sm flex items-center gap-2 rounded-full transition ${panelTab === 'company' ? 'bg-brand-green text-white' : 'bg-white text-gray-600 border'}`}><Briefcase size={14}/> ข้อมูลบริษัท</button>}
@@ -4262,7 +4266,7 @@ export default function App() {
                  <div className="flex gap-4">
                    <a href={isVisualEditMode ? "#" : companyInfo?.facebook} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Facebook size={24}/></a>
                    <a href={isVisualEditMode ? "#" : "https://youtube.com/@startupupofficial?si=dmoPEcMTw5okXPMn"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Youtube size={24}/></a>
-                   <a href={isVisualEditMode ? "#" : companyInfo?.line} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><MessageCircle size={24}/></a>
+                   <a href={isVisualEditMode ? "#" : lineContactHref()} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><MessageCircle size={24}/></a>
                    <a href={isVisualEditMode ? "#" : "https://www.instagram.com/startupuprealestate/"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Instagram size={24}/></a>
                    <a href={isVisualEditMode ? "#" : "https://www.tiktok.com/@startupupofficial"} onClick={(e)=>{if(isVisualEditMode)e.preventDefault()}} target={isVisualEditMode ? "_self" : "_blank"} rel="noopener noreferrer" className={`transition ${isVisualEditMode ? 'pointer-events-none opacity-50' : 'hover:text-white opacity-80 hover:-translate-y-1'}`}><Video size={24}/></a>
                  </div>

@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lineContactHref } from '../../lib/lineAttribution';
 import {
   ChevronLeft, ChevronRight, MapPin, Phone, Calendar,
 } from 'lucide-react';
@@ -275,7 +276,7 @@ export default function SalePageV4({
      * LINE เอาค่านั้นมาต่อท้ายข้อความให้เอง กลายเป็นลิงก์หน้าหลักโผล่มาอีกอัน
      * ปิดการส่ง referrer ทิ้ง LINE ก็ไม่มีอะไรให้ต่อท้าย เหลือลิงก์บ้านหลังเดียว
      */
-    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+    window.open(lineContactHref(property, msg), '_blank', 'noopener,noreferrer');
   }, [property, houseAndSoi, pickDate, hour, minute, thaiDate, trackContact]);
 
   // ลูกศรซ้าย-ขวาบนคีย์บอร์ดเลื่อนรูปได้
@@ -541,7 +542,7 @@ export default function SalePageV4({
               </a>
               <a
                 className={`sp4-act line${isEditMode ? ' is-off' : ''}`}
-                href={isEditMode ? '#' : companyInfo?.line}
+                href={isEditMode ? '#' : lineContactHref(property)}
                 target="_blank" rel="noopener noreferrer"
                 onClick={() => trackContact('contact_line')}
               >

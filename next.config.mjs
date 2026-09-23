@@ -13,6 +13,7 @@ const contentSecurityPolicy = [
     "'unsafe-inline'",
     isDevelopment ? "'unsafe-eval'" : "",
     "https://apis.google.com",
+    "https://static.line-scdn.net",
     "https://www.googletagmanager.com",
     // Google Ads tags injected by GTM, plus the TikTok Pixel in pages/_app.js.
     // https://developers.google.com/tag-platform/security/guides/csp
@@ -52,13 +53,17 @@ const contentSecurityPolicy = [
     "https://server.arcgisonline.com",
     "https://tile.openstreetmap.org",
     "https://*.tile.openstreetmap.org",
-    "https://placehold.co"
+    "https://placehold.co",
+    "https://profile.line-scdn.net"
   ].join(' '),
   "media-src 'self' https://res.cloudinary.com https://*.cloudinary.com",
   [
     "connect-src",
     "'self'",
     "https://api.cloudinary.com",
+    "https://api.line.me",
+    "https://access.line.me",
+    "https://liff.line.me",
     "https://*.cloudinary.com",
     "https://*.googleapis.com",
     "https://*.google.com",

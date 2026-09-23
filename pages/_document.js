@@ -2,7 +2,8 @@ import { Html, Head, Main, NextScript } from 'next/document'
 
 const GOOGLE_TAG_MANAGER_ID = 'GTM-N27PQGL2'
 
-export default function Document() {
+export default function Document(props) {
+  const privateRoute = /^\/(admin|line)(\/|$)/.test(props.__NEXT_DATA__?.page || '')
   return (
     <Html lang="th">
       <Head>
@@ -20,14 +21,14 @@ export default function Document() {
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
       </Head>
       <body>
-        <noscript>
+        {!privateRoute && <noscript>
           <iframe
             src={`https://www.googletagmanager.com/ns.html?id=${GOOGLE_TAG_MANAGER_ID}`}
             height="0"
             width="0"
             style={{ display: 'none', visibility: 'hidden' }}
           />
-        </noscript>
+        </noscript>}
         <Main />
         <NextScript />
       </body>

@@ -1,10 +1,16 @@
-import { Component as ReactComponent } from 'react'
+import { Component as ReactComponent, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { captureAttribution } from '../lib/lineAttribution'
 import 'leaflet/dist/leaflet.css'
 import '../styles/globals.css'
 import Script from 'next/script'
+import Head from 'next/head'
 
 const GOOGLE_TAG_MANAGER_ID = 'GTM-N27PQGL2'
 const TIKTOK_PIXEL_ID = 'D929G0BC77U133LMGG50'
+
+// Capture incoming campaign parameters before the site's SPA rewrites its URL.
+if (typeof window !== 'undefined') captureAttribution()
 
 /**
  * ถ้าส่วนใดของหน้าพังตอน render React จะถอดทั้งหน้าออก ผู้ใช้เห็นเป็นจอขาวเปล่าๆ แจ้งปัญหาไม่ได้
@@ -49,9 +55,19 @@ class ErrorBoundary extends ReactComponent {
 }
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter()
+  const privateRoute = /^\/(admin|line)(\/|$)/.test(router.pathname)
+  useEffect(() => {
+    const capture = () => captureAttribution()
+    router.events.on('routeChangeComplete', capture)
+    return () => router.events.off('routeChangeComplete', capture)
+  }, [router.events])
   return (
     <>
-      <Script id="google-tag-manager" strategy="afterInteractive">
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" key="viewport" />
+      </Head>
+      {!privateRoute && <><Script id="google-tag-manager" strategy="afterInteractive">
         {`
           // Keep custom event calls queued while GTM loads the Google tag.
           window.dataLayer = window.dataLayer || [];
@@ -75,6 +91,7 @@ export default function App({ Component, pageProps }) {
           }(window, document, 'ttq');
         `}
       </Script>
+      </>}
       <ErrorBoundary>
         <Component {...pageProps} />
       </ErrorBoundary>

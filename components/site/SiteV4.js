@@ -13,6 +13,7 @@
  */
 
 import Head from 'next/head';
+import { lineContactHref } from '../../lib/lineAttribution';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Settings, Search, CircleUserRound, Menu, X, Loader, Save, Layout, Type,
@@ -577,7 +578,7 @@ export default function SiteV4({ basePath = '/v4' }) {
               <div className="v4-social">
                 <a href={companyInfo?.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook"><Facebook /></a>
                 <a href="https://youtube.com/@startupupofficial" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><Youtube /></a>
-                <a href={companyInfo?.line} target="_blank" rel="noopener noreferrer" aria-label="LINE"><MessageCircle size={26} /></a>
+                <a href={lineContactHref()} target="_blank" rel="noopener noreferrer" aria-label="LINE"><MessageCircle size={26} /></a>
                 <a href="https://www.instagram.com/startupuprealestate/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Instagram /></a>
                 <a href="https://www.tiktok.com/@startupupofficial" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Video size={26} /></a>
               </div>
