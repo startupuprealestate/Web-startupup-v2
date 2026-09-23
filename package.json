@@ -23,5 +23,11 @@
     "eslint-config-next": "16.2.4",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.2.4"
+  },
+  "allowScripts": {
+    "protobufjs": true,
+    "sharp": true,
+    "unrs-resolver": true,
+    "@firebase/util": true
   }
 }
