@@ -1,12 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reportRange, reportPlatform, defaultReportRange } from '../lib/lineReport.js';
+import { reportRange, reportPlatform, defaultReportRange, formatReportDate, parseReportDate } from '../lib/lineReport.js';
 import { claimIntent, createIntent, recordLineEvent, listLeads, backfillVisitHistory, LEADS_COLLECTION, VISITS_COLLECTION } from '../lib/lineServer.js';
 import { qrAttribution } from '../lib/lineLaunch.js';
 
 const day = { start: '2026-09-23', end: '2026-09-23' };
 const at = Date.parse('2026-09-23T12:00:00+07:00');
 const profile = { userId: 'U' + 'a'.repeat(32), displayName: 'Repeat customer', pictureUrl: '' };
+test('report inputs use day/month/year without locale ambiguity and preserve Thai date boundaries', () => {
+  assert.equal(formatReportDate('2026-09-01'), '01/09/2026');
+  assert.equal(parseReportDate('04/09/2026'), '2026-09-04');
+  assert.equal(parseReportDate('29/02/2028'), '2028-02-29');
+  const range = reportRange({ start: parseReportDate('23/09/2026'), end: parseReportDate('24/09/2026') });
+  assert.equal(range.from, Date.parse('2026-09-22T17:00:00Z'));
+  assert.equal(range.until, Date.parse('2026-09-24T17:00:00Z'));
+  for (const value of ['', '9/4/2026', '2026-09-23', '09/23/2026', '31/04/2026', '29/02/2026', null]) {
+    assert.throws(() => parseReportDate(value), /dd\/mm\/yyyy/);
+  }
+  assert.throws(() => reportRange({ start: parseReportDate('24/09/2026'), end: parseReportDate('23/09/2026') }), { status: 400 });
+});
 // Query-capable store: tests run the real reporting/claim functions without live customer writes.
 function memoryDb() {
   const data = new Map();

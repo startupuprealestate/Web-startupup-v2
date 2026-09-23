@@ -5,7 +5,7 @@ import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from
 import { ArrowLeft, ArrowUpRight, Check, Copy, Link2, LockKeyhole, RefreshCw, Search, Users, X } from 'lucide-react';
 import { lineAdminAuth } from '../../lib/lineClientAuth';
 import { SOURCE_LABELS, sourceGroup } from '../../lib/lineAttribution';
-import { PLATFORM_LABELS, defaultReportRange, reportPlatform, reportRange } from '../../lib/lineReport';
+import { PLATFORM_LABELS, defaultReportRange, formatReportDate, parseReportDate, reportPlatform, reportRange } from '../../lib/lineReport';
 import styles from '../../styles/line-leads.module.css';
 
 const ROOT = 'https://www.startupup-real-estate.com';
@@ -113,8 +113,11 @@ export default function LineLeads({ isDemo, initialRange }) {
   function applyDates(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const dates = { start: form.get('start'), end: form.get('end') };
-    try { reportRange(dates); }
+    let dates;
+    try {
+      dates = { start: parseReportDate(form.get('start')), end: parseReportDate(form.get('end')) };
+      reportRange(dates);
+    }
     catch (err) { setDateError(err.message); return; }
     setDateError(''); setFilters(previous => ({ ...previous, ...dates }));
   }
@@ -153,14 +156,14 @@ export default function LineLeads({ isDemo, initialRange }) {
         {!isDemo && setup && (!setup.enabled || !setup.ready || !setup.webhookReady) && <div className={styles.notice}><strong>กำลังเตรียมเชื่อมบัญชีหลัก</strong><p>{!setup.enabled || !setup.ready ? 'ยังไม่เปิดใช้งานการติดตามจริง ปุ่มติดต่อยังพาลูกค้าไป LINE ได้ตามปกติ' : 'บันทึกต้นทางได้แล้ว แต่ยังไม่ได้เปิดรับสถานะเพิ่มเพื่อนและข้อความจาก LINE'}</p><p>ให้ผู้ดูแลตั้งค่า LINE Login / LIFF และการเชื่อมฐานข้อมูลตามคู่มือติดตั้งก่อนเปิดใช้งาน</p></div>}
         <section className={styles.panel} aria-labelledby="sources-title" aria-busy={loading}>
           <div className={styles.panelHeading}><div><h2 id="sources-title">สรุปที่มาลูกค้าแยกช่องทาง</h2><p>นับจำนวนครั้งที่เข้ามา รวมลูกค้าคนเดิมที่กลับมาอีกครั้ง</p></div><button className={styles.secondary} disabled={loading || isDemo} onClick={() => load(user)}><RefreshCw size={16} aria-hidden="true" />{loading ? 'กำลังโหลด…' : 'อัปเดตข้อมูล'}</button></div>
-          <form className={styles.dateFilters} onSubmit={applyDates}>
-            <label><span>วันที่เริ่มต้น</span><input type="date" name="start" required defaultValue={initialRange.start} aria-describedby="date-help" /></label>
-            <label><span>วันที่สิ้นสุด</span><input type="date" name="end" required defaultValue={initialRange.end} aria-describedby="date-help" /></label>
+          <form className={styles.dateFilters} onSubmit={applyDates} noValidate>
+            <label><span>วันที่เริ่มต้น</span><input type="text" name="start" required placeholder="dd/mm/yyyy" maxLength={10} defaultValue={formatReportDate(initialRange.start)} aria-describedby={dateError ? 'date-help date-error' : 'date-help'} aria-invalid={Boolean(dateError)} /></label>
+            <label><span>วันที่สิ้นสุด</span><input type="text" name="end" required placeholder="dd/mm/yyyy" maxLength={10} defaultValue={formatReportDate(initialRange.end)} aria-describedby={dateError ? 'date-help date-error' : 'date-help'} aria-invalid={Boolean(dateError)} /></label>
             <button className={styles.primary} disabled={loading}>ดูข้อมูลตามวันที่</button>
           </form>
-          {dateError && <p role="alert" className={styles.error}>{dateError}</p>}
-          <p id="date-help" className={styles.muted}>เวลาไทย · รวมทั้งวันเริ่มต้นและวันสิ้นสุด · กดดูข้อมูลตามวันที่เพื่อใช้ช่วงที่เลือก</p>
-          <p className={styles.resultCount} role="status">ช่วงที่แสดง {filters.start} ถึง {filters.end}{loading ? ' · กำลังโหลด…' : ''}</p>
+          {dateError && <p id="date-error" role="alert" className={styles.error}>{dateError}</p>}
+          <p id="date-help" className={styles.muted}>วัน/เดือน/ปี ค.ศ. (dd/mm/yyyy) · เวลาไทย · รวมทั้งวันเริ่มต้นและวันสิ้นสุด · กดดูข้อมูลตามวันที่เพื่อใช้ช่วงที่เลือก</p>
+          <p className={styles.resultCount} role="status">ช่วงที่แสดง {formatReportDate(filters.start)} ถึง {formatReportDate(filters.end)}{loading ? ' · กำลังโหลด…' : ''}</p>
           <table className={styles.sourceTable}><caption className={styles.srOnly}>จำนวนรายการแต่ละช่องทางในช่วงวันที่ที่แสดง</caption><thead><tr><th scope="col">ช่องทาง</th><th scope="col">จำนวนครั้ง</th><th scope="col"><span className={styles.srOnly}>ดูรายชื่อ</span></th></tr></thead><tbody>
             {Object.entries(PLATFORM_LABELS).map(([key, label]) => <tr key={key} data-active={filters.platform === key}><th scope="row"><button className={styles.platformButton} disabled={loading} aria-haspopup="dialog" aria-controls="line-customer-dialog" onClick={() => choosePlatform(key)}>{label}</button></th><td className={styles.numeric}>{counts?.[key] ?? '—'}</td><td><button className={styles.textButton} disabled={loading} onClick={() => choosePlatform(key)} aria-haspopup="dialog" aria-controls="line-customer-dialog" aria-label={`ดูรายชื่อจาก ${label}`}>ดูรายชื่อ <ArrowUpRight size={14} aria-hidden="true" /></button></td></tr>)}
           </tbody><tfoot><tr><th scope="row">รวมทุกช่องทาง</th><td className={styles.numeric}>{total ?? '—'}</td><td><button className={styles.textButton} disabled={loading} onClick={() => choosePlatform('all')} aria-haspopup="dialog" aria-controls="line-customer-dialog">ดูทั้งหมด</button></td></tr></tfoot></table>
@@ -168,7 +171,7 @@ export default function LineLeads({ isDemo, initialRange }) {
           <p className={styles.muted}>ข้อมูลเดิมก่อนเปิดประวัติแยกครั้งแสดงได้เท่าที่มีบันทึกไว้ และติดป้าย “ข้อมูลเดิม” การกลับมาครั้งใหม่จะเพิ่มแถวโดยไม่แทนที่แถวเดิม</p>
         </section>
         <dialog id="line-customer-dialog" ref={dialogRef} className={styles.customerDialog} aria-labelledby="customers-title" aria-describedby="customers-period" onClose={() => { setListOpen(false); setSelected(null); }}>
-          <div className={styles.dialogHeader}><div><h2 id="customers-title" tabIndex={-1} ref={listRef}>รายการลูกค้า · {PLATFORM_LABELS[filters.platform] || 'ทุกช่องทาง'}</h2><p id="customers-period">{filters.start} ถึง {filters.end} · เวลาไทย</p></div><button className={styles.closeDialog} onClick={() => dialogRef.current?.close()} aria-label="ปิดรายการลูกค้า"><X size={22} aria-hidden="true" /></button></div>
+          <div className={styles.dialogHeader}><div><h2 id="customers-title" tabIndex={-1} ref={listRef}>รายการลูกค้า · {PLATFORM_LABELS[filters.platform] || 'ทุกช่องทาง'}</h2><p id="customers-period">{formatReportDate(filters.start)} ถึง {formatReportDate(filters.end)} · เวลาไทย</p></div><button className={styles.closeDialog} onClick={() => dialogRef.current?.close()} aria-label="ปิดรายการลูกค้า"><X size={22} aria-hidden="true" /></button></div>
           <div className={styles.dialogBody} aria-busy={loading}>
           <div className={styles.dialogToolbar}><p>รายการแยกแต่ละครั้งที่เข้ามา รวมลูกค้าคนเดิมที่กลับมา</p>{filters.platform !== 'all' && <button className={styles.secondary} disabled={loading} onClick={() => choosePlatform('all')}>ดูทุกช่องทาง</button>}</div>
           {error && <div className={styles.error} role="alert">{error}{user && <button className={styles.textButton} onClick={() => load(user)}>ลองอีกครั้ง</button>}</div>}
