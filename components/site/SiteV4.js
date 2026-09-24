@@ -48,14 +48,15 @@ const Youtube = ({ size = 26 }) => (
  * ถ้าไม่ตรง หน้าจะเลื่อนถึงแล้วยังขยับต่ออีกนิดเพราะโดนดูดเข้าสถานี
  */
 const STATION_AT = Object.fromEntries(CINEMA_STATIONS.map(({ key, at }) => [key, at]));
-const SIMPLE_HOME_QUERY = '(max-width: 860px), (hover: none) and (pointer: coarse), (prefers-reduced-motion: reduce)';
+// Open the cinematic home on every screen; keep the static accessibility fallback.
+const SIMPLE_HOME_QUERY = '(prefers-reduced-motion: reduce)';
 const subscribeHomeLayout = callback => {
   const query = window.matchMedia(SIMPLE_HOME_QUERY);
   query.addEventListener('change', callback);
   return () => query.removeEventListener('change', callback);
 };
 const getHomeLayout = () => window.matchMedia(SIMPLE_HOME_QUERY).matches;
-const getServerHomeLayout = () => true;
+const getServerHomeLayout = () => false;
 
 /**
  * ลิงก์แผนที่ออฟฟิศ — ใช้ลิงก์ที่ปักหมุดไว้แล้ว ไม่ใช่ค้นหาจากข้อความที่อยู่

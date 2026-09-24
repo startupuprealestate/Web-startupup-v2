@@ -21,9 +21,10 @@ def setup(browser, width=390, height=844, touch=True, reduced=False):
         'company': None, 'visual': None, 'popup': None}))
     page.route('**/*firestore.googleapis.com/**', lambda route: route.abort())
     page.goto(os.environ.get('SITE_TEST_BASE_URL', 'http://localhost:3000'))
-    if touch or reduced:
+    if reduced:
         page.get_by_role('button', name='ชมบรรยากาศบ้าน', exact=True).click()
     expect(page.locator('.cinema-scroll')).to_be_visible()
+    page.wait_for_function("() => document.querySelector('.cine-progress i').style.transform.startsWith('scaleX(')")
     expect(page.locator('.cine-reading-nav')).to_have_count(0)
     return context, page, errors
 
@@ -97,7 +98,8 @@ with sync_playwright() as p:
     swipe(page, cdp, -160)
     assert page.evaluate('scrollY') > before, 'Ordinary content must scroll freely'
     page.locator('.v4-logo').click()
-    expect(page.locator('.cinema-scroll')).to_have_count(0)
+    expect(page.locator('.cinema-scroll')).to_be_visible()
+    at(page, 0)
     assert page.evaluate('getComputedStyle(document.documentElement).scrollSnapType') == 'none'
     assert not errors, errors
     context.close()

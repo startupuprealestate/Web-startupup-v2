@@ -61,11 +61,10 @@ def no_overflow(page):
 
 with sync_playwright() as p:
     browser = p.chromium.launch(channel='msedge', headless=True)
-    context, page, errors, videos = setup(browser)
+    context, page, errors, videos = setup(browser, reduced=True)
     expect(page.locator('#mobile-home-title')).to_be_visible()
     expect(page.locator('.cinema-scroll')).to_have_count(0)
     expect(page.get_by_role('link', name='ดูรายละเอียดบ้าน')).to_have_count(3)
-    assert not videos, 'Default mobile home must not load story video'
     no_overflow(page)
     for text in ['ดูบ้านทั้งหมด', 'เลือกทำเล']:
         box = page.get_by_role('link', name=text, exact=True).first.bounding_box()
@@ -121,11 +120,13 @@ with sync_playwright() as p:
     for width, height, touch, reduced in [(320, 568, True, False), (768, 1024, True, False),
             (844, 390, True, False), (1365, 900, False, True), (1365, 900, False, False)]:
         context, page, errors, videos = setup(browser, width, height, touch, reduced)
-        simple = touch or reduced
+        simple = reduced
         expect(page.locator('#mobile-home-title' if simple else '.cinema-scroll')).to_be_visible()
         no_overflow(page)
         page.screenshot(path=f'coverage/home-{width}-{height}-reduce-{reduced}.png')
         if not simple:
+            title = page.locator('.hero-title').bounding_box()
+            assert title['y'] >= 60, 'Opening title must stay below the mobile header'
             box = page.locator('.cine-quick-actions').bounding_box()
             assert box['y'] >= 0 and box['y'] + box['height'] <= height
             assert page.evaluate('''() => {
@@ -140,9 +141,15 @@ with sync_playwright() as p:
             for house in HOUSES:
                 expect(page.get_by_role('heading', name=house['project_name'], exact=True)).to_be_visible()
             page.screenshot(path='coverage/home-all-houses.png')
-            page.get_by_role('navigation', name='เมนูหลัก').get_by_role('link', name='หน้าหลัก', exact=True).click()
+            page.locator('.v4-logo').click()
             expect(page.locator('.cinema-scroll')).to_be_visible()
-            page.get_by_role('navigation', name='เมนูหลัก').get_by_role('link', name='บ้านทั้งหมด', exact=True).click()
+            expect(page.locator('#mobile-home-title')).to_have_count(0)
+            expect(page.locator('.v4-exit-story')).to_have_count(0)
+            if page.get_by_role('button', name='เมนู', exact=True).is_visible():
+                page.get_by_role('button', name='เมนู', exact=True).click()
+                page.locator('#site-mobile-menu').get_by_role('button', name='บ้านทั้งหมด', exact=True).click()
+            else:
+                page.get_by_role('navigation', name='เมนูหลัก').get_by_role('link', name='บ้านทั้งหมด', exact=True).click()
             expect(page).to_have_url(re.compile('tab=all'))
             expect(page.locator('.cinema-scroll')).to_have_count(0)
             expect(page.get_by_role('heading', name=re.compile('รายการทั้งหมด'))).to_contain_text('3 รายการ')

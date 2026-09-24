@@ -1496,6 +1496,7 @@ const cinemaCss = `
   .cinema-scroll .hero-stats { gap: 8px; margin-top: 16px; flex-wrap: nowrap; }
   /* จอสัมผัสตัด backdrop-filter ทิ้ง — มันบังคับให้เครื่องประกอบภาพใหม่ทุกเฟรมที่วิดีโอขยับ
      บนมือถือเห็นเป็นภาพกระพริบ และกินแบตโดยได้ความสวยเพิ่มน้อยมาก */
+  .cinema-scroll .cine-quick-actions button,
   .cinema-scroll .hero-stats .hero-stat {
     backdrop-filter: none; -webkit-backdrop-filter: none;
     background: rgba(20, 32, 22, 0.42);
@@ -1546,6 +1547,22 @@ const cinemaCss = `
     text-shadow: 0 2px 14px rgba(0,0,0,0.55);
   }
   .cinema-scroll .scroll-hint-arrow { display: block; font-size: 1.4rem; line-height: 1; }
+}
+@media (hover: none) and (max-height: 700px) {
+  .cinema-scroll .hero-stack { padding: 72px 16px 12px; gap: 8px; box-sizing: border-box; }
+  .cinema-scroll .hero-title { font-size: 1.7rem; }
+  .cinema-scroll .cine-quick-actions { flex-wrap: nowrap; gap: 8px; margin: 12px 0; }
+  .cinema-scroll .cine-quick-actions button { min-height: 48px; padding: 10px 12px; font-size: 16px; }
+  .cinema-scroll .hero-stats { margin-top: 10px; }
+  .cinema-scroll .hero-stats .hero-stat { min-width: 0; padding: 12px 5px; }
+  .cinema-scroll .hero-stats strong { font-size: 1.45rem; }
+  .cinema-scroll .hero-tags { margin-top: 12px; gap: 6px; }
+  .cinema-scroll .hero-tags span { padding: 0 10px; font-size: 0.72rem; }
+  .cinema-scroll .scroll-hint { margin-top: 12px; gap: 4px; }
+}
+@media (hover: none) and (max-height: 450px) {
+  .cinema-scroll .hero-stats, .cinema-scroll .hero-tags { display: none; }
+  .cinema-scroll .scroll-hint { margin-top: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cinema-scroll .scene, .cinema-scroll .hero-title, .cinema-scroll .intro-copy,
