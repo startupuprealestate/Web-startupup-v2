@@ -9,6 +9,19 @@ html, body {
   position: relative;
 }
 
+/* One-finger scrolling and ordinary taps must not trigger smart/double-tap zoom.
+   Deliberate pinch zoom remains available for reading and accessibility. */
+html { touch-action: manipulation; }
+
+@media (any-pointer: coarse), (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select, textarea, [contenteditable="true"] {
+    /* iOS zooms focused form fields whose computed text is smaller than 16px.
+       Override the compact component styles, including short-screen rules. */
+    font-size: max(16px, 1rem) !important;
+  }
+}
+
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;

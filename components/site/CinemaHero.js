@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import LocationCarousel from './LocationCarousel';
 import FeaturedHomes from './FeaturedHomes';
+import CinemaNavigation, { CINEMA_STATIONS as STATIONS } from './CinemaNavigation';
 import {
   EditableText, getOptimizedImg, PropertyMap, DEFAULT_VISUAL_CONTENT,
   normalizeLocations, visibleLocations, matchesMainArea, searchResultHref,
@@ -120,20 +121,7 @@ const EASE_TAU = 150;
  * พอเลื่อนแล้วหยุดใกล้จุดพวกนี้ หน้าจะค่อย ๆ ดูดเข้าที่ให้เอง
  * จะได้ไม่เลยไปครึ่ง ๆ กลาง ๆ แล้วต้องเลื่อนย้อนกลับมาเอง
  */
-const STATIONS = [
-  { key: 'locations', at: 2050 },  // แถบทำเล — sightsShown เต็มช่วง 1880-2230
-  { key: 'featured',  at: 3740 },  // แถบประเภทบ้าน — แผ่น room1 เต็มช่วง 3610-3900
-  { key: 'map',       at: 6480 },  // แผนที่หมุดโครงการ — mapIn เต็มหลัง 6376
-];
 const SNAP_CATCH = 480;   // เลื่อนผ่านมาแล้วหยุดใกล้กว่านี้ = ดูดเข้าสถานี
-/**
- * ระยะยึดตอน "กำลังจอดอยู่ที่สถานีนั้น" — กว้างกว่าปกติเกือบเท่าตัว
- * เพราะออกจากสถานีต้องยากกว่าเข้า ไม่งั้นสะบัดทีเดียวก็หลุดไปค้างกลางทาง
- *
- * ต้องน้อยกว่าครึ่งหนึ่งของระยะห่างสถานีที่ใกล้กันที่สุด (2050->3740 = 1690 ครึ่งคือ 845)
- * ไม่งั้นสองสถานีจะแย่งกันดูด
- */
-const SNAP_HOLD = 820;
 const SNAP_MIN = 14;      // ใกล้กว่านี้ถือว่าถึงแล้ว ไม่ต้องขยับ
 const SNAP_IDLE = 150;    // หยุดเลื่อนนานเท่านี้ถึงเริ่มดูด (ms)
 const SNAP_MS = 520;      // ใช้เวลาเลื่อนเข้าที่
@@ -351,6 +339,8 @@ export default function CinemaHero({
   visualContent,
   updateVisualContent,
   isEditMode = false,
+  onShowAllHomes,
+  onShowLocations,
 }) {
   /**
    * ข้อความในฉาก : ค่าที่หลังบ้านแก้ไว้มาก่อน ถ้ายังไม่เคยแก้ก็ใช้ค่าเริ่มต้น
@@ -394,6 +384,7 @@ export default function CinemaHero({
   const hudRef = useRef(null);
   const mapWrapRef = useRef(null);
   const searchRef = useRef(null);
+  const quickActionsRef = useRef(null);
   const featuredRef = useRef(null);
   const panelRefs = useRef({});
   const sliderRef = useRef(null);
@@ -436,6 +427,7 @@ export default function CinemaHero({
     let targetMouseX = 0, targetMouseY = 0;
     let mouseX = 0, mouseY = 0;
     let targetScroll = 0, smoothScroll = 0;
+    let previousTargetScroll = 0;
     let initialized = false, rafPending = false, disposed = false;
     let lastFrameAt = 0;
 
@@ -460,7 +452,7 @@ export default function CinemaHero({
     const getScrollDistance = () => clamp(
       -section.getBoundingClientRect().top,
       0,
-      section.offsetHeight - window.innerHeight
+      section.offsetHeight - (section.querySelector('.stage')?.offsetHeight || window.innerHeight)
     );
 
     const update = () => {
@@ -468,6 +460,8 @@ export default function CinemaHero({
       if (disposed) return;
 
       targetScroll = getScrollDistance();
+      const targetJump = Math.abs(targetScroll - previousTargetScroll);
+      previousTargetScroll = targetScroll;
 
       /**
        * ปกติหน่วงภาพด้วย lerp ให้ไหลตามนิ้วอย่างนุ่มนวล
@@ -478,7 +472,7 @@ export default function CinemaHero({
        * ถ้าปล่อยให้ lerp ไล่ หัวอ่านวิดีโอจะกวาดจากต้นเรื่องไปจนถึงจุดนั้นกินเวลาเป็นวินาที
        * ผู้ใช้จะเห็นเป็น "วิดีโอเล่นเอง" ทั้งที่ยังไม่ได้แตะจอเลย
        */
-      if (!initialized || reduceMotion.matches || Math.abs(targetScroll - smoothScroll) > JUMP_PX) {
+      if (!initialized || reduceMotion.matches || targetJump > JUMP_PX) {
         smoothScroll = targetScroll;
         initialized = true;
         lastFrameAt = performance.now();
@@ -522,7 +516,7 @@ export default function CinemaHero({
         layer.style.setProperty('--op', '1');
         layer.style.setProperty('--x', `${(px * -14).toFixed(2)}px`);
         layer.style.setProperty('--y', `${(py * -8).toFixed(2)}px`);
-        layer.style.setProperty('--sc', (BASE_SCALE + progress * 0.04).toFixed(4));
+        layer.style.setProperty('--sc', (coarse ? 1 : BASE_SCALE + progress * 0.04).toFixed(4));
       }
 
       /* --- หัวเรื่องกับข้อความเปิด ---
@@ -556,6 +550,11 @@ export default function CinemaHero({
         const shown = introExit < 0.85;
         searchRef.current.style.pointerEvents = shown ? 'auto' : 'none';
         searchRef.current.inert = !shown;
+      }
+      if (quickActionsRef.current) {
+        const shown = introExit < 0.85;
+        quickActionsRef.current.style.pointerEvents = shown ? 'auto' : 'none';
+        quickActionsRef.current.inert = !shown;
       }
       if (featuredRef.current) {
         const shown = Number(panelRefs.current.room1?.style.getPropertyValue('--op') || 0) > 0.6;
@@ -684,8 +683,8 @@ export default function CinemaHero({
      * แล้วเห็นภาพขยับเองทั้งที่ยังไม่ได้แตะอะไร
      */
     let userInput = false;
-    let heldAt = null;      // สถานีที่กำลังจอดอยู่ (ยึดแน่นกว่าสถานีอื่น)
-    let pullBacks = 0;      // ดึงกลับสถานีนี้ไปแล้วกี่ครั้งติด — ครั้งที่สองปล่อยให้ออกได้
+    let lastScrollY = window.scrollY;
+    let scrollDirection = 0;
 
     const cancelSnap = () => {
       if (snapTimer) { clearTimeout(snapTimer); snapTimer = null; }
@@ -718,12 +717,7 @@ export default function CinemaHero({
 
     const armSnap = () => {
       if (snapTimer) clearTimeout(snapTimer);
-      /**
-       * จอสัมผัสปล่อยให้ CSS scroll-snap จัดการแทน
-       * เพราะ JS ต้องรอให้โมเมนตัมหยุดสนิทก่อนถึงจะเริ่มดูด แต่การสะบัดนิ้วแรง ๆ
-       * บน iOS ไหลไปได้เป็นพันพิกเซล พอหยุดก็เลย SNAP_CATCH ไปแล้ว ไม่มีอะไรดึงกลับ
-       * ส่วนเบราว์เซอร์รู้จุดจอดตั้งแต่ตอนกำลังหน่วงความเร็ว จึงจอดตรงได้
-       */
+      // Touch gestures finish at a chapter in CinemaNavigation; do not run a second snap engine.
       if (coarse) return;
       if (editModeRef.current || reduceMotion.matches || !userInput) return;
       if (performance.now() < snapSuppressUntil) return;
@@ -733,37 +727,34 @@ export default function CinemaHero({
         const here = getScrollDistance();
         /* อยู่นอกฉาก (ยังไม่เข้า หรือเลื่อนพ้นไปอ่านเนื้อหาข้างล่างแล้ว) ไม่ยุ่ง */
         if (here <= 0 || here >= section.offsetHeight - window.innerHeight) return;
-        /**
-         * สถานีที่กำลังจอดอยู่ยึดแน่นกว่าสถานีที่แค่เลื่อนผ่าน — ออกยากกว่าเข้า
-         *
-         * แต่ต้องไม่กลายเป็นกรงขัง : ถ้าดึงกลับไปแล้วผู้ใช้ยังยืนยันจะออกอีก
-         * ครั้งที่สองให้ใช้ระยะปกติ เลื่อนพ้น SNAP_CATCH เมื่อไหร่ก็ไปได้เลย
-         */
         let best = null;
         for (const st of STATIONS) {
-          const home = heldAt === st.at;
-          const radius = (home && pullBacks === 0) ? SNAP_HOLD : SNAP_CATCH;
+          // Assist only ahead of the user's movement, never pull back to a point just left.
+          if ((st.at - here) * scrollDirection <= 0) continue;
           const d = Math.abs(st.at - here);
-          if (d <= radius && (!best || d < best.d)) best = { d, at: st.at, home };
+          if (d <= SNAP_CATCH && (!best || d < best.d)) best = { d, at: st.at };
         }
-        if (!best) { heldAt = null; pullBacks = 0; return; }
-        if (best.d < SNAP_MIN) { heldAt = best.at; pullBacks = 0; return; }
-        if (best.home) pullBacks += 1;
-        else { heldAt = best.at; pullBacks = 0; }
+        if (!best || best.d < SNAP_MIN) return;
         runSnap(section.offsetTop + best.at);
       }, SNAP_IDLE);
     };
 
     const onScroll = () => {
       requestTick();
+      const delta = window.scrollY - lastScrollY;
+      lastScrollY = window.scrollY;
       /* ถ้าการเลื่อนนี้คือฝีมือเราเอง อย่าไปยกเลิกตัวเอง */
       if (snapRaf !== null && snapWroteY >= 0 && Math.abs(window.scrollY - snapWroteY) <= SNAP_TAKEOVER) return;
+      if (Math.abs(delta) > 1) scrollDirection = Math.sign(delta);
       cancelSnap();
       armSnap();
     };
     const onResize = () => { cancelSnap(); requestTick(); };
     /* สัญญาณว่าผู้ใช้กำลังลงมือเอง — หยุดดูดทันทีทุกกรณี */
-    const onUserTakeOver = () => { userInput = true; cancelSnap(); };
+    const onUserTakeOver = () => {
+      userInput = true;
+      cancelSnap();
+    };
     const onTouchStart = () => { userInput = true; touching = true; cancelSnap(); };
     const onTouchEnd = () => { touching = false; armSnap(); };
     const onPointerMove = (event) => {
@@ -902,15 +893,6 @@ export default function CinemaHero({
       <style>{cinemaCss}</style>
 
       <section className={`cinema-scroll${isEditMode ? ' is-editing' : ''}`} ref={sectionRef} aria-label={`เรื่องเล่าบ้าน ${companyName} แบบเลื่อนหน้าจอ`}>
-        {/**
-          * จุดจอดสำหรับ CSS scroll-snap — ใช้เฉพาะจอสัมผัส
-          * วางที่ระยะ scroll ของแต่ละสถานีพอดี พอ scroll-snap-align: start
-          * เบราว์เซอร์จะจัดให้ขอบบนจอตรงกับจุดนี้ = ระยะเลื่อนเท่ากับ at พอดี
-          */}
-        {STATIONS.map((st) => (
-          <i key={st.key} className="cine-snap" style={{ top: `${st.at}px` }} aria-hidden="true" />
-        ))}
-
         <div className="stage">
           <div className="world" ref={worldRef}>
 
@@ -984,6 +966,10 @@ export default function CinemaHero({
 
               <div className="intro-copy">
                 <p className="intro-lead">{tagline}</p>
+                <div className="cine-quick-actions" ref={quickActionsRef}>
+                  <button type="button" disabled={isEditMode} onClick={onShowAllHomes}>ดูบ้านทั้งหมด</button>
+                  <button type="button" disabled={isEditMode} onClick={onShowLocations}>เลือกทำเล</button>
+                </div>
 
                 {/*
                   ตัวเลขเล่าแบรนด์ — เป็นข้อความล้วน กดไม่ได้ เพราะไม่มีปลายทางให้ไป
@@ -1004,10 +990,11 @@ export default function CinemaHero({
                   <CineText tag="span" field="cineTag2" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
                   <CineText tag="span" field="cineTag3" copy={copy} onChange={updateVisualContent} isEditMode={isEditMode} />
                 </div>
-                {/* คำว่า "เลื่อนลง" อยู่เหนือไอคอนเมาส์ และขยับด้วยอนิเมชันชุดเดียวกับจุดในไอคอน */}
-                <div className="scroll-hint" aria-hidden="true">
-                  <span className="scroll-hint-word">เลื่อนลง</span>
-                  <i className="scroll-hint-mouse"><b /></i>
+                <div className="scroll-hint">
+                  <span className="scroll-hint-word">ดูบ้านด้านล่าง</span>
+                  <span className="scroll-hint-touch">ปัดหน้าจอขึ้นเพื่อดูต่อ</span>
+                  <i className="scroll-hint-mouse" aria-hidden="true"><b /></i>
+                  <span className="scroll-hint-arrow" aria-hidden="true">↓</span>
                 </div>
               </div>
             </div>
@@ -1087,32 +1074,24 @@ export default function CinemaHero({
             <PropertyMap properties={mapProps} onSelectProp={onSelectProp} variant="story" />
           </div>
         </div>
+        <CinemaNavigation sectionRef={sectionRef} isEditMode={isEditMode} />
       </section>
     </>
   );
 }
 
 const cinemaCss = `
-/* จุดจอดของ scroll-snap สูงศูนย์ มองไม่เห็น ไม่กินพื้นที่ ไม่รับการกด */
-.cinema-scroll .cine-snap {
-  position: absolute; left: 0; width: 1px; height: 1px;
-  pointer-events: none; visibility: hidden;
-}
-/**
- * เปิด scroll-snap เฉพาะเครื่องที่ไม่มีเมาส์
- * ใช้ proximity ไม่ใช่ mandatory — จอดให้เมื่อหยุดใกล้จุดเท่านั้น
- * ถ้าตั้งใจสะบัดยาวผ่านไปเลย ก็ยังไปได้ ไม่ถูกบังคับให้จอดทุกจุด
- * หน้าอื่นไม่มีจุดจอด จึงเลื่อนอิสระเหมือนเดิม
- */
+.cinema-scroll .cine-quick-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 18px 0; pointer-events: auto; }
+.cinema-scroll .cine-quick-actions button { min-height: 52px; padding: 12px 24px; border: 1px solid rgba(253, 241, 225, 0.3); border-radius: 10px; background: rgba(253, 241, 225, 0.13); color: #fdf1e1; backdrop-filter: blur(6px); font: inherit; font-size: 18px; font-weight: 500; cursor: pointer; }
+.cinema-scroll .cine-quick-actions button:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+/* Touch navigation chooses the reading point on release. Native snapping would
+   compete with that landing and can pull the page back during the next gesture. */
 @media (hover: none) {
-  html { scroll-snap-type: y proximity; }
-  .cinema-scroll .cine-snap { scroll-snap-align: start; }
-}
-@media (hover: none) and (prefers-reduced-motion: reduce) {
   html { scroll-snap-type: none; }
 }
 
 .cinema-scroll {
+  --cine-viewport-height: 100vh;
   --shade-top-alpha: 0; --shade-mid-alpha: 0; --shade-bottom-alpha: 0;
   --blur-tint: 7, 18, 11;
   --title-y: 0px; --title-scale: 1; --title-opacity: 1;
@@ -1120,11 +1099,12 @@ const cinemaCss = `
   --map-top: clamp(232px, 33vh, 330px);
   --map-height: clamp(300px, 56vh, 540px);
   position: relative;
-  height: calc(100vh + ${STORY_LENGTH}px);
+  height: calc(var(--cine-viewport-height) + ${STORY_LENGTH}px);
+  background: #0b1f12;
   color: #fdf1e1;
 }
 .cinema-scroll .stage {
-  position: sticky; top: 0; height: 100vh; min-height: 620px;
+  position: sticky; top: 0; height: var(--cine-viewport-height); min-height: 620px;
   overflow: hidden; isolation: isolate; background: #0b1f12;
 }
 .cinema-scroll .world {
@@ -1303,8 +1283,8 @@ const cinemaCss = `
 .cinema-scroll .scroll-hint-word {
   color: #fdf1e1; font-size: 0.88rem; font-weight: 500; letter-spacing: 0.02em;
   text-shadow: 0 2px 14px rgba(0,0,0,0.55);
-  animation: cinemaScrollHint 1.8s ease-in-out infinite;
 }
+.cinema-scroll .scroll-hint-touch, .cinema-scroll .scroll-hint-arrow { display: none; }
 .cinema-scroll .scroll-hint-mouse {
   display: block; width: 24px; height: 40px;
   border: 1px solid rgba(253,241,225,0.55); border-radius: 999px;
@@ -1549,6 +1529,24 @@ const cinemaCss = `
   .cinema-scroll .panel-map h2 { font-size: 1.45rem; }
   .cinema-scroll .panel-map p { font-size: 0.86rem; }
 }
+/* Use the largest viewport so collapsing Safari's bars cannot expose the page
+   below the sticky scene. Unlike dvh, this keeps the video's crop stable. */
+@media (hover: none), (pointer: coarse) {
+  @supports (height: 100lvh) {
+    .cinema-scroll { --cine-viewport-height: 100lvh; }
+  }
+  .cinema-scroll .stage { min-height: 0; }
+  /* Keep the opening text within the area visible even with the bars expanded. */
+  @supports (height: 100svh) {
+    .cinema-scroll .hero-stack { height: 100svh; bottom: auto; }
+  }
+  .cinema-scroll .scroll-hint-mouse { display: none; }
+  .cinema-scroll .scroll-hint-touch {
+    display: block; font-size: 0.78rem; color: #fdf1e1;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.55);
+  }
+  .cinema-scroll .scroll-hint-arrow { display: block; font-size: 1.4rem; line-height: 1; }
+}
 @media (prefers-reduced-motion: reduce) {
   .cinema-scroll .scene, .cinema-scroll .hero-title, .cinema-scroll .intro-copy,
   .cinema-scroll .story-panel, .cinema-scroll .sights-slider { transition: none; }
@@ -1567,8 +1565,9 @@ const cinemaCss = `
   .cinema-scroll .fh-wrap { margin-top: 14px; }
 }
 @media (max-width: 767px) and (max-height: 700px) {
-  .cinema-scroll .panel-featured { top: clamp(300px, 50vh, 380px); }
-  .cinema-scroll .fh-card { --fh-h: clamp(260px, 50vh, 360px); }
+  .cinema-scroll .panel-featured { top: calc((100svh - 30px) / 2); }
+  .cinema-scroll .fh-card { --fh-h: clamp(180px, calc(100svh - 368px), 300px); }
   .cinema-scroll .fh-wrap { margin-top: 12px; }
+  .cinema-scroll .cine-map { height: min(var(--map-height), calc(100svh - var(--map-top) - 108px)); }
 }
 `;

@@ -37,20 +37,20 @@ export const FEATURED_HOMES = [
   },
 ];
 
-export default function FeaturedHomes({ hrefFor, onSelectCategory, isEditMode = false }) {
+export default function FeaturedHomes({ hrefFor, onSelectCategory, isEditMode = false, directLinks = false }) {
   /* บนจอสัมผัสไม่มี hover — แตะหนึ่งครั้งให้กางก่อน แตะซ้ำถึงจะเข้าหน้าหมวด */
   const [openKey, setOpenKey] = useState(null);
 
   const handleClick = useCallback((event, item) => {
     if (isEditMode) { event.preventDefault(); return; }
     const coarse = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
-    if (coarse && openKey !== item.key) {
+    if (coarse && !directLinks && openKey !== item.key) {
       event.preventDefault();
       setOpenKey(item.key);
       return;
     }
     if (onSelectCategory) onSelectCategory(event, item.category);
-  }, [isEditMode, onSelectCategory, openKey]);
+  }, [isEditMode, onSelectCategory, openKey, directLinks]);
 
   return (
     <div className="fh-card" role="list">

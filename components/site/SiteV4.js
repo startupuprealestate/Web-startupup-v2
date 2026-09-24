@@ -14,7 +14,7 @@
 
 import Head from 'next/head';
 import { lineContactHref } from '../../lib/lineAttribution';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Settings, Search, CircleUserRound, Menu, X, Loader, Save, Layout, Type,
   ChevronLeft, ChevronRight, MessageCircle, Video,
@@ -22,13 +22,13 @@ import {
 
 import useSiteData from './useSiteData';
 import CinemaHero from './CinemaHero';
+import { CINEMA_STATIONS } from './CinemaNavigation';
+import MobileHome, { scrollToHomeLocations } from './MobileHome';
 import SalePageV4 from './SalePageV4';
-import FeaturedHomes from './FeaturedHomes';
 import useRevealOnScroll from './useRevealOnScroll';
 import { safeJsonLd } from '../../lib/seo';
 import {
   HomeSection, LocationSection, PropertiesList, CalculatorSection, PortfolioSection,
-  searchResultHref,
   LoginModal, CustomAlertModal, AdminPanel, Lightbox, SmartImage, EditableText,
   getOptimizedImg, DEFAULT_LOCATIONS_DATA, DEFAULT_VISUAL_CONTENT, db, appId,
 } from './SiteApp';
@@ -47,7 +47,15 @@ const Youtube = ({ size = 26 }) => (
  * ระยะเลื่อนของจังหวะในฉากเปิด ต้องตรงกับ STATIONS ใน CinemaHero
  * ถ้าไม่ตรง หน้าจะเลื่อนถึงแล้วยังขยับต่ออีกนิดเพราะโดนดูดเข้าสถานี
  */
-const STATION_AT = { locations: 2050, featured: 3740 };
+const STATION_AT = Object.fromEntries(CINEMA_STATIONS.map(({ key, at }) => [key, at]));
+const SIMPLE_HOME_QUERY = '(max-width: 860px), (hover: none) and (pointer: coarse), (prefers-reduced-motion: reduce)';
+const subscribeHomeLayout = callback => {
+  const query = window.matchMedia(SIMPLE_HOME_QUERY);
+  query.addEventListener('change', callback);
+  return () => query.removeEventListener('change', callback);
+};
+const getHomeLayout = () => window.matchMedia(SIMPLE_HOME_QUERY).matches;
+const getServerHomeLayout = () => true;
 
 /**
  * ลิงก์แผนที่ออฟฟิศ — ใช้ลิงก์ที่ปักหมุดไว้แล้ว ไม่ใช่ค้นหาจากข้อความที่อยู่
@@ -92,7 +100,12 @@ export default function SiteV4({ basePath = '/v4' }) {
   } = site;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [navOverHero, setNavOverHero] = useState(false);
+  const prefersSimpleHome = useSyncExternalStore(subscribeHomeLayout, getHomeLayout, getServerHomeLayout);
+  const [watchStory, setWatchStory] = useState(false);
+  const simpleHome = prefersSimpleHome && !watchStory;
+  const pendingLocationJump = useRef(false);
+  // The initial route renders the hero; do not paint a light navbar before effects run.
+  const [navOverHero, setNavOverHero] = useState(true);
 
   /**
    * ช่องค้นหาบนแถบเมนู — ปกติเป็นแค่ปุ่มแว่นขยาย กดแล้วช่องพิมพ์คลี่ออกตรงนั้น
@@ -154,12 +167,12 @@ export default function SiteV4({ basePath = '/v4' }) {
     if (userRole) setShowAdminPanel(true); else setShowLoginModal(true);
   }, [adminEntryPending, authReady, userRole, setShowAdminPanel, setShowLoginModal]);
 
-  const isCinemaView = activeTab === 'home' && !selectedProperty && !requestedPropSlug;
+  const isCinemaView = activeTab === 'home' && !selectedProperty && !requestedPropSlug && !simpleHome;
   const isWaiting = loading || Boolean(requestedPropSlug);
 
   /* globals.css ซ่อนทุกส่วนที่ติด .reveal-on-scroll ไว้ที่ opacity 0
      ต้องมีตัวนี้คอยเติม .is-revealed ให้ ไม่งั้นเนื้อหาทั้งหน้าจะไม่โผล่เลย */
-  useRevealOnScroll([activeTab, selectedProperty, loading, publicProperties.length]);
+  useRevealOnScroll([activeTab, selectedProperty, loading, publicProperties.length, isCinemaView]);
 
   /* ใช้เฉดมืดตราบใดที่แถบเมนูยังลอยอยู่บนภาพของฉากภาพยนตร์
      (วัดจากขอบล่างของ section จริง ไม่ใช่แค่ scrollY เพราะฉากยาวหลายพันพิกเซล) */
@@ -175,12 +188,20 @@ export default function SiteV4({ basePath = '/v4' }) {
       window.removeEventListener('scroll', measure);
       window.removeEventListener('resize', measure);
     };
-  }, [activeTab, selectedProperty, loading]);
+  }, [activeTab, selectedProperty, loading, isCinemaView]);
 
   useEffect(() => { setIsMenuOpen(false); }, [activeTab, selectedProperty]);
 
 
-  const navTransparent = navOverHero;
+  const navTransparent = isCinemaView && navOverHero;
+
+  useEffect(() => {
+    if (!simpleHome || activeTab !== 'home' || selectedProperty || requestedPropSlug || !pendingLocationJump.current) return;
+    const frame = requestAnimationFrame(() => {
+      if (scrollToHomeLocations()) pendingLocationJump.current = false;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [simpleHome, activeTab, selectedProperty, requestedPropSlug]);
 
   /**
    * กด "ทำเล" บนเมนู = พาไปที่จังหวะการ์ดทำเลในฉากเปิด ไม่ใช่หน้าแยกอีกต่อไป
@@ -200,7 +221,13 @@ export default function SiteV4({ basePath = '/v4' }) {
    */
   const goHomeTop = useCallback(() => {
     if (isVisualEditMode) return;
+    pendingLocationJump.current = false;
+    setWatchStory(false);
     goTab('home');
+    if (prefersSimpleHome) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      return;
+    }
 
     /**
      * บนมือถือฉากเปิดเปิด scroll-snap ของ CSS ไว้ที่ตัว html
@@ -223,10 +250,16 @@ export default function SiteV4({ basePath = '/v4' }) {
     /* ย้ำอีกครั้งหลังพ้นเวลาหน่วงของตัวดูดเข้าสถานีใน CinemaHero (SNAP_IDLE = 150ms) */
     setTimeout(toTop, 220);
     setTimeout(() => { toTop(); root.style.scrollSnapType = prevSnap; }, 500);
-  }, [goTab, isVisualEditMode]);
+  }, [goTab, isVisualEditMode, prefersSimpleHome]);
 
   const goStation = useCallback((at) => {
     if (isVisualEditMode) return;
+    if (simpleHome) {
+      if (activeTab === 'home' && !selectedProperty && scrollToHomeLocations()) return;
+      pendingLocationJump.current = true;
+      goTab('home');
+      return;
+    }
     if (activeTab !== 'home' || selectedProperty) goTab('home');
     let tries = 0;
     const jump = () => {
@@ -238,18 +271,15 @@ export default function SiteV4({ basePath = '/v4' }) {
       if (tries++ < 40) setTimeout(jump, 100);
     };
     setTimeout(jump, 60);
-  }, [activeTab, goTab, isVisualEditMode, selectedProperty]);
+  }, [activeTab, goTab, isVisualEditMode, selectedProperty, simpleHome]);
 
   /**
-   * เมนูทำเลกับบ้านทั้งหมดพาไปหาจังหวะในฉากเปิด ไม่ใช่เปิดหน้าแยก
-   *   ทำเล        -> แผงค้นหาบ้านที่ใช่สำหรับคุณ พร้อมการ์ดทำเล
-   *   บ้านทั้งหมด  -> แผงบ้านเด่นที่เราคัดสรร
-   * แท็บ location กับ all ยังอยู่ เพราะปุ่มอื่นในหน้ายังลิงก์เข้าไปได้
+   * เมนูบ้านทั้งหมดเปิดรายการรวมเหมือนปุ่มหน้าแรกในทุกโหมด
    */
   const onNavTab = useCallback((key) => {
+    setIsMenuOpen(false);
     if (key === 'home') { goHomeTop(); return; }
     if (key === 'location') { goStation(STATION_AT.locations); return; }
-    if (key === 'all') { goStation(STATION_AT.featured); return; }
     goTab(key);
   }, [goHomeTop, goStation, goTab]);
   const label = (field, fallback) => visualContent?.[field] || DEFAULT_VISUAL_CONTENT[field] || fallback;
@@ -276,10 +306,10 @@ export default function SiteV4({ basePath = '/v4' }) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(structuredData) }} />
       </Head>
 
-      <div className={`v4-shell${isVisualEditMode ? ' is-editing' : ''}`}>
+      <div className={`v4-shell${isVisualEditMode ? ' is-editing' : ''}${simpleHome ? ' is-simple-layout' : ''}`}>
 
         {/* ---------- ป็อปอัปโปรโมชั่น ---------- */}
-        {showPopupModal && isCinemaView && (
+        {showPopupModal && activeTab === 'home' && !selectedProperty && !requestedPropSlug && (
           <div className="v4-popup-backdrop">
             <div className="v4-popup">
               <SmartImage src={getOptimizedImg(popupData.imageUrl, 900)} alt="โปรโมชั่น" className="v4-popup-img" />
@@ -299,12 +329,14 @@ export default function SiteV4({ basePath = '/v4' }) {
           <div className="v4-nav-inner">
             <button
               type="button"
-              className="v4-logo"
+              className={`v4-logo${prefersSimpleHome && isCinemaView ? ' v4-exit-story' : ''}`}
               disabled={isVisualEditMode}
               onClick={goHomeTop}
             >
-              {companyInfo?.logoUrl
-                ? <SmartImage src={getOptimizedImg(companyInfo.logoUrl, 220)} alt={companyInfo?.name || 'STARTUP UP'} />
+              {prefersSimpleHome && isCinemaView
+                ? <><ChevronLeft size={20} aria-hidden="true" /> กลับหน้าเลือกบ้าน</>
+                : companyInfo?.logoUrl
+                ? <SmartImage src={getOptimizedImg(companyInfo.logoUrl, 220)} alt={companyInfo?.name || 'STARTUP UP'} width={220} height={156} priority />
                 : <span>{companyInfo?.name || 'STARTUP UP'}</span>}
             </button>
 
@@ -365,14 +397,14 @@ export default function SiteV4({ basePath = '/v4' }) {
                   <CircleUserRound size={22} />
                 </button>
               )}
-              <button type="button" className="v4-burger" aria-label="เมนู" onClick={() => setIsMenuOpen(v => !v)}>
+              <button type="button" className="v4-burger" aria-label="เมนู" aria-expanded={isMenuOpen} aria-controls="site-mobile-menu" onClick={() => setIsMenuOpen(v => !v)}>
                 {isMenuOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
             </div>
           </div>
 
           {isMenuOpen && (
-            <div className="v4-mobile-menu">
+            <div className="v4-mobile-menu" id="site-mobile-menu">
               <form className="v4-msearch" role="search" onSubmit={submitMenuSearch}>
                 <input
                   type="text"
@@ -417,6 +449,17 @@ export default function SiteV4({ basePath = '/v4' }) {
               {activeTab === 'home' && (
                 <>
                   {!requestedPropSlug && (
+                    simpleHome ? <MobileHome
+                      properties={publicProperties}
+                      loading={loading}
+                      onSelectProp={handleSelectProperty}
+                      onFilter={handleFilterSelect}
+                      onSearch={handleGlobalSearch}
+                      onShowAll={() => goTab('all')}
+                      onWatchStory={() => { setWatchStory(true); window.scrollTo({ top: 0, behavior: 'instant' }); }}
+                      visualContent={visualContent}
+                      isEditMode={isVisualEditMode}
+                    /> : <>
                     <CinemaHero
                       properties={publicProperties}
                       onSelectProp={handleSelectProperty}
@@ -428,7 +471,10 @@ export default function SiteV4({ basePath = '/v4' }) {
                       visualContent={visualContent}
                       updateVisualContent={updateVisualContent}
                       isEditMode={isVisualEditMode}
+                      onShowAllHomes={() => goTab('all')}
+                      onShowLocations={() => goStation(STATION_AT.locations)}
                     />
+                    </>
                   )}
                   {/* เนื้อหาหน้าแรกตัวจริงบนเว็บหลัก : ช่องค้นหา บ้านแยกหมวด
                       และ "ซื้อบ้านกับ StartupUp ดีอย่างไร?" — แก้ได้จากหลังบ้านครบ
@@ -462,40 +508,13 @@ export default function SiteV4({ basePath = '/v4' }) {
               {activeTab !== 'home' && isWaiting && <Waiting />}
 
               {activeTab === 'all' && !isWaiting && (
-                <div className="v4-allhomes">
-                  {/* บ้านเด่นที่เราคัดสรร — ชุดเดียวกับที่อยู่ในฉากเปิด */}
-                  <section className="v4-allhomes-featured reveal-on-scroll">
-                    <FeaturedHomes
-                      isEditMode={isVisualEditMode}
-                      hrefFor={(cat) => searchResultHref('category', cat)}
-                      onSelectCategory={(e, cat) => {
-                        if (e.ctrlKey || e.metaKey || e.button) return;
-                        e.preventDefault();
-                        handleFilterSelect('category', cat);
-                      }}
-                    />
-                  </section>
-
-                  {/* แยกตามหมวดหมู่ ทาวน์เฮาส์ / บ้านแฝด / บ้านเดี่ยว */}
-                  <HomeSection
-                    showLocationMarquee={false}
-                    showMap={false}
-                    showSearch={false}
-                    showCategorySections
-                    properties={publicProperties}
-                    loading={loading}
-                    onSelectProp={handleSelectProperty}
-                    setActiveTab={setActiveTab}
-                    onSelectLocation={handleFilterSelect}
-                    onSearchCategory={handleFilterSelect}
-                    onSearch={handleGlobalSearch}
-                    visualContent={visualContent}
-                    updateVisualContent={updateVisualContent}
-                    onUpdateLocationImage={handleLocationImageUpdate}
-                    onRemoveLocationImage={handleRemoveLocationImage}
-                    isEditMode={isVisualEditMode}
-                  />
-                </div>
+                <PropertiesList
+                  properties={publicProperties}
+                  onSelectProp={handleSelectProperty}
+                  visualContent={visualContent}
+                  updateVisualContent={updateVisualContent}
+                  isEditMode={isVisualEditMode}
+                />
               )}
 
               {activeTab === 'location' && !isWaiting && (
@@ -673,6 +692,15 @@ const v4Css = `
   font-family: Prompt, system-ui, sans-serif;
 }
 .v4-shell.is-editing { padding-bottom: 96px; }
+.v4-shell.is-simple-layout .v4-nav { background: #fdf1e1; border-bottom: 1px solid #d7e0d5; }
+.v4-shell.is-simple-layout .v4-mobile-menu button { min-height: 52px; font-size: 18px; }
+.v4-shell .v4-nav .v4-logo.v4-exit-story {
+  display: flex; align-items: center; gap: 6px; min-height: 48px;
+  padding: 8px 10px; border: 1px solid #153d28; border-radius: 10px;
+  background: #fffdf8; color: #153d28; font: inherit; font-size: 15px; letter-spacing: normal; text-shadow: none;
+  box-shadow: 0 3px 16px #0002; cursor: pointer;
+}
+.v4-exit-story:focus-visible { outline: 3px solid #98691d; outline-offset: 3px; }
 
 /* หัวข้อทุกส่วนใช้ฟอนต์ชุดใหม่ รวมถึงส่วนที่ยกมาจากเว็บเดิม */
 .v4-shell h1, .v4-shell h2, .v4-shell h3,
@@ -712,10 +740,17 @@ const v4Css = `
   font-family: var(--display); font-size: 22px; font-weight: 300; letter-spacing: 0.2em;
   white-space: nowrap;
 }
-.v4-logo img { height: 42px; width: auto; object-fit: contain; display: block; }
+.v4-logo img {
+  height: 42px; width: auto; object-fit: contain; display: block;
+  background: transparent; padding: 4px 6px; box-sizing: content-box;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));
+}
 .v4-logo:disabled { opacity: 0.5; cursor: default; }
 .v4-nav.is-ghost .v4-logo { color: #fdf1e1; text-shadow: 0 2px 16px rgba(0,0,0,0.4); }
-.v4-nav.is-ghost .v4-logo img { filter: brightness(0) invert(1); }
+/* Keep the uploaded logo transparent on every page; only the shadow varies. */
+.v4-nav.is-ghost .v4-logo img {
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35)); background: transparent;
+}
 
 .v4-nav-links { display: flex; align-items: center; gap: clamp(18px, 2vw, 38px); }
 .v4-nav-links a {
